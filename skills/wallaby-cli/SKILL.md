@@ -113,8 +113,8 @@ npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{line:134},express
 The command prints a Markdown report like this; a non-zero exit code usually means the report contains failing tests or errors, though it may also mean the CLI or Wallaby itself failed:
 
 - `Status`, `Mode`, `Summary`, `Fatal Error`, and `Global Errors` sections are the same as in the run command report
-- `Runtime Values` shows captured values inline with the source file, line, expression, formatted value, and test that produced each value; if additional values are omitted, it links to the full [Runtime Values](references/runtime-values.md) report
-- When `--test` is used, the main report filters runtime values by test name and links to the full unfiltered report when other values are available
+- `Runtime Values` shows captured values inline with the source file, line, expression, formatted value, and test that produced each value; if requested inspections could not be captured, it also shows warnings with the path, expression, location, and reason; if additional values are omitted, it links to the full [Runtime Values](references/runtime-values.md) report
+- When `--test` is used, the main report filters runtime values by test name and links to the full unfiltered report when other values are available; uncaptured-inspection warnings are still shown because they describe requested inspection locations, not captured values from a specific test
 
 The linked [Runtime Values](references/runtime-values.md) report can be pretty large. For specific results, prefer `grep` over reading the whole file. For example, to find all captured values for `src/alerts.ts`:
 

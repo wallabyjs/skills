@@ -6,9 +6,13 @@ The report starts with a fixed top-level heading:
 # Runtime Values
 ```
 
-After the heading, the file contains one section per captured runtime value:
+After the heading, the file may start with uncaptured-inspection warnings, then contains one section per captured runtime value:
 
 ````md
+Wallaby could not capture runtime values for the locations listed below:
+
+- path: `<source-file-path>`; expression: `<expression>`; location: <location>; reason: <reason>
+
 ## <source-file-path>
 - line: <line>
 - expression: `<expression>`
@@ -25,6 +29,10 @@ After the heading, the file contains one section per captured runtime value:
 
 Format details:
 
+- The uncaptured-inspection warning block is optional. It appears when `inspect` was asked to evaluate an expression but Wallaby could not capture a runtime value for that requested location.
+- Warning entries use this shape: `- path: <inline-code-path>; expression: <inline-code-expression>; location: <location>; reason: <reason>`.
+- Warning locations are formatted as `fragment: <inline-code-fragment>`, `line <line>, column <column>`, or `line <line>`, matching the location object passed to the inspect command.
+- Warning reasons can include path normalization failure, missing file, missing file content, expression not found, expression evaluation failure, missing covered file, missing line, missing covered ranges, or no matching runtime value in the logs.
 - `## <source-file-path>` starts one runtime value entry. The same source file can appear many times when multiple tests or multiple executions reach the inspected location.
 - `- line:` is the source line where Wallaby evaluated the expression.
 - `- expression:` is the inspected expression.
@@ -37,3 +45,9 @@ Format details:
 The main inspect report may omit some matching runtime values. Open `runtime-values.md` when the main report says more runtime values were omitted.
 
 When the inspect command uses `--test`, the main report filters runtime values by test name. This file still contains all captured values, not only values matching the filter.
+
+If no runtime values were captured but Wallaby has warnings for the requested inspection locations, the report still includes the warning block and then says:
+
+```md
+No runtime values captured.
+```

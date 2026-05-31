@@ -78,7 +78,7 @@ Use `npx -y @wallabyjs/cli inspect ...` to inspect a variable or expression at r
 
 The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y @wallabyjs/cli run --skill`, then use `inspect` for follow-up debugging.
 
-Pass one inspection object with a file path, a source location, and an expression. The source location can be a code fragment, a line number, or a line and column. For example, to inspect the value of the `alerts` variable in `src/alerts.ts`:
+Pass one or more inspection objects, each with a file path, a source location, and an expression. Multiple inspections can be included in the same command by passing additional inspection objects as separate arguments. The source location can be a code fragment, a line number, or a line and column. For example, to inspect the value of the `alerts` variable in `src/alerts.ts`:
 
 ```sh
 npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{fragment:'const alerts: WeatherAlert[] = [];'},expression:'alerts'}"

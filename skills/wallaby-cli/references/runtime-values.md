@@ -44,9 +44,9 @@ Format details:
 
 The main inspect report may omit some matching runtime values. Open `runtime-values.md` when the main report says more runtime values were omitted.
 
-When the inspect command uses `--test`, the main report filters runtime values by test name. This file still contains all captured values, not only values matching the filter.
+When the inspect command uses `--test`, the main report filters runtime values by test name. This file still contains all captured values, not only the values matching the filter.
 
-If no runtime values were captured but Wallaby has warnings for the requested inspection locations, the report still includes the warning block and then says:
+If no runtime values were captured but Wallaby has warnings for the requested inspection locations, `runtime-values.md` is still written. The main inspect report may show the same warning block without linking to the file. The file then says:
 
 ```md
 No runtime values captured.

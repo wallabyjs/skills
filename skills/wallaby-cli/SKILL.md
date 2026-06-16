@@ -29,7 +29,7 @@ Use `npx -y @wallabyjs/cli run --skill` as the default command for project-wide 
 
 The command also accepts specific test file paths as arguments: `npx -y @wallabyjs/cli run --skill ./src/feature-a.spec.ts ./src/feature-b.spec.ts`. If Wallaby is already running in project mode, calling the command with specific test file paths still reports project-wide results, but it prioritizes failures from the requested files. If Wallaby is not running, the command starts a new instance in exclusive mode, meaning Wallaby runs and reports only the specified test files. To add more test files to an active exclusive instance, run the command again with those paths. To return to project mode and run the full project, run the command again without test file paths.
 
-Use `--config` to point to a specific project Wallaby config file. Always include `--skill` so the instance stays running for follow-up runs.
+Use `--config` to point to a specific project Wallaby config file. Always include `--skill` so the instance stays running for follow-up runs. Use `--rerun` only when test results depend on an external file or state that Wallaby does not watch, such as a database update or generated file outside the project's file set.
 
 ```sh
 npx -y @wallabyjs/cli run --skill # runs all project tests if needed and reports project-wide test results
@@ -38,7 +38,6 @@ npx -y @wallabyjs/cli run --skill ./src/feature-a.spec.ts ./src/feature-b.spec.t
 npx -y @wallabyjs/cli run --skill ./src/feature-a.spec.ts --test "feature-a / should match the expected value" # runs the specified test in the specified file
 npx -y @wallabyjs/cli run --skill --snapshots ./src/feature-a.spec.ts ./src/feature-b.spec.ts # updates snapshots for the specified test files, or for all tests if no files are given
 npx -y @wallabyjs/cli run --skill --snapshots ./src/feature-a.spec.ts --test "feature-a / should match the expected snapshots" # updates snapshots for the named test in the specified file
-npx -y @wallabyjs/cli run --skill --rerun ./src/feature-a.spec.ts ./src/feature-b.spec.ts # re-runs the specified test files, or all project tests if no files are given; useful when Wallaby did not detect a relevant change, such as a file edit or an external change like a database update
 npx -y @wallabyjs/cli run --update # updates Wallaby to the latest version, then runs all project tests and reports project-wide test results; use when the CLI reports compatibility errors
 npx -y @wallabyjs/cli run --help # shows help for the run command
 ```
@@ -50,13 +49,13 @@ The command prints a Markdown report like this; a non-zero exit code usually mea
 - `Note: Wallaby is running tests only from specific test locations:` followed by the active test locations, shown after `Mode: exclusive` and before `Summary`
 - `Summary` with total, passed, failed, skipped, todo, and coverage percentage
 - `Fatal Error` when Wallaby reports a run-level error instead of an individual test failure; this can happen before tests start, for example when file processing fails. It shows the fatal error message
-- `Global Errors` when Wallaby reports errors not tied to a single test; it shows the first few global error messages and stack traces inline and links to [Global Errors](./references/global-errors.md) when there are more
-- `Failing Tests` when one or more tests fail; it shows the most important failing test names, locations, execution times, error messages, expected/actual or snapshot values, logs, covered files, and stack traces inline, and links to the full [Failing Tests](./references/failing-tests.md) report when additional failing tests are omitted
-- [All Tests](./references/all-tests.md) shows the full test inventory; it starts with top tests by execution time plus top files by execution time and test count, then groups tests by test file and shows test names, statuses, locations, timings, logs, and covered files
-- [Coverage](./references/coverage.md) starts with the top files by change risk anti-patterns and metric definitions, then shows one section per covered source file with its coverage percentage, cyclomatic complexity, change risk, and a `Covered by` list of the test files that cover it
-- [Global Logs](./references/global-logs.md) when Wallaby captures logs not tied to a single test; it shows log locations, runtime context, and logged messages
+- `Global Errors` when Wallaby reports errors not tied to a single test; it shows the first few global error messages and stack traces inline and links to the full global-errors report when there are more. Read `references/global-errors.md` when you need the full global-errors report format.
+- `Failing Tests` when one or more tests fail; it shows the most important failing test names, locations, execution times, error messages, expected/actual or snapshot values, logs, covered files, and stack traces inline, and links to the full failing-tests report when additional failing tests are omitted. Read `references/failing-tests.md` when you need the full failing-tests report format.
+- `All Tests` shows the full test inventory; it starts with top tests by execution time plus top files by execution time and test count, then groups tests by test file and shows test names, statuses, locations, timings, logs, and covered files. Read `references/all-tests.md` when you need the full all-tests report format.
+- `Coverage` starts with the top files by change risk anti-patterns and metric definitions, then shows one section per covered source file with its coverage percentage, cyclomatic complexity, change risk, and a `Covered by` list of the test files that cover it. Read `references/coverage.md` when you need the full coverage report format.
+- `Global Logs` when Wallaby captures logs not tied to a single test; it shows log locations, runtime context, and logged messages. Read `references/global-logs.md` when you need the full global-logs report format.
 
-The linked [All Tests](./references/all-tests.md) and [Coverage](./references/coverage.md) reports, and the [Failing Tests](./references/failing-tests.md) report when the main report says more failures were omitted, can be large. For specific results, prefer `grep` over reading the whole file. For example, to find all tests that mention `estimates sleet near freezing`:
+Generated `All Tests`, `Coverage`, and `Failing Tests` reports can be large. For specific results in generated reports, prefer `grep` over reading the whole file. For example, to find all tests that mention `estimates sleet near freezing`:
 
 ```sh
 grep -Pzo '(?sm)^### [^\n]*estimates sleet near freezing[^\n]*\n.*?(?=^### |^## |\z)' all-tests.md | tr '\0' '\n'
@@ -124,10 +123,10 @@ When `--clear` is used without inspection targets, the command prints `Cleared a
 Otherwise, the command prints a Markdown report like this; a non-zero exit code usually means the report contains failing tests or errors, though it may also mean the CLI or Wallaby itself failed:
 
 - `Status`, `Mode`, `Summary`, `Fatal Error`, and `Global Errors` sections are the same as in the run command report
-- `Runtime Values` shows captured values inline with the source file, line, expression, formatted value, and test that produced each value; if requested inspections could not be captured, it also shows warnings with the path, expression, location, and reason; if additional values are omitted, it links to the full [Runtime Values](./references/runtime-values.md) report
+- `Runtime Values` shows captured values inline with the source file, line, expression, formatted value, and test that produced each value; if requested inspections could not be captured, it also shows warnings with the path, expression, location, and reason; if additional values are omitted, it links to the full runtime-values report. Read `references/runtime-values.md` when you need the full runtime-values report format.
 - When `--test` is used, the main report filters runtime values by test name and links to the full unfiltered report when other values are available; uncaptured-inspection warnings are still shown because they describe requested inspection locations, not captured values from a specific test
 
-The linked [Runtime Values](./references/runtime-values.md) report can be large. For specific results, prefer `grep` over reading the whole file. For example, to find all captured values for `src/alerts.ts`:
+Generated `Runtime Values` reports can be large. For specific results, prefer `grep` over reading the whole file. For example, to find all captured values for `src/alerts.ts`:
 
 ```sh
 grep -Pzo '(?sm)^## src/alerts\.ts[^\n]*\n.*?(?=^## |\z)' runtime-values.md | tr '\0' '\n'
@@ -158,10 +157,10 @@ npx -y @wallabyjs/cli analyze --target="test" "{path:'tests/temperature.spec.ts'
 Test analysis explains one test's execution. The main report includes:
 
 - `Status`, `Mode`, `Summary`, `Fatal Error`, and `Global Errors` sections are the same as in the run command report
-- `Test Analysis` with the selected test's name, status, location, execution time, errors, logs, covered files, and [Test Execution Trace](./references/test-trace.md). The trace is a single logical view of the code the test executes, with source lines shown in execution order, file names, and line numbers. Its `test starts here` comment marks the first line of code in the selected test, after imports and other setup code that runs before the test.
-- `Covered Files` links to per-file [`.wcov`](./references/wcov.md) coverage artifacts for source files covered by the selected test. Each artifact contains the file content with pseudo-block comments after every source line. The comments annotate line numbers and line-level coverage (covered, partially covered, or uncovered). Partially covered lines can include uncovered column ranges with the corresponding source expressions.
+- `Test Analysis` with the selected test's name, status, location, execution time, errors, logs, covered files, and `Test Execution Trace`. The trace is a single logical view of the code the test executes, with source lines shown in execution order, file names, and line numbers. Its `test starts here` comment marks the first line of code in the selected test, after imports and other setup code that runs before the test. Read `references/test-trace.md` when you need the full test-trace format.
+- `Covered Files` links to per-file `.wcov` coverage artifacts for source files covered by the selected test. Each artifact contains the file content with pseudo-block comments after every source line. The comments annotate line numbers and line-level coverage (covered, partially covered, or uncovered). Partially covered lines can include uncovered column ranges with the corresponding source expressions. Read `references/wcov.md` when you need the full `.wcov` artifact format.
 
-The linked [Test Execution Trace](./references/test-trace.md) artifact can be large. Prefer targeted search instead of reading the full artifact. For example, to find the selected test start:
+Generated `Test Execution Trace` artifacts can be large. Prefer targeted search instead of reading the full artifact. For example, to find the selected test start:
 
 ```sh
 grep -n -B 20 -A 5 'test starts here' test-trace.md
@@ -186,11 +185,11 @@ npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts',locati
 File analysis explains the tests related to one source or test file, or to a specific source file location. The main report includes:
 
 - `File Analysis` for a source file, or `Test File Analysis` for a test file
-- file metadata and analysis metrics such as path, location, test count, line count, coverage, change risk anti-patterns, and size when available, plus `Detailed File Coverage` linked to a [`.wcov`](./references/wcov.md) artifact. The artifact contains the file content with pseudo-block comments after every source line. The comments annotate line numbers and line-level coverage (covered, partially covered, or uncovered). Partially covered lines can include uncovered column ranges with the corresponding source expressions.
+- file metadata and analysis metrics such as path, location, test count, line count, coverage, change risk anti-patterns, and size when available, plus `Detailed File Coverage` linked to a `.wcov` artifact. The artifact contains the file content with pseudo-block comments after every source line. The comments annotate line numbers and line-level coverage (covered, partially covered, or uncovered). Partially covered lines can include uncovered column ranges with the corresponding source expressions. Read `references/wcov.md` when you need the full `.wcov` artifact format.
 - `Covering Tests` for source files, or `Tests` for test files, with test names, statuses, locations, and execution times. Failed tests also show error messages and stack traces. Test-file analysis can show logs and covered files for each test.
-- [File Tests](./references/file-tests.md), which contains the full external test report. `File Analysis` always links it because the main report's `Covering Tests` section does not include test errors or logs. `Test File Analysis` links it when the main report omits additional tests.
+- `File Tests` contains the full external test report. `File Analysis` always links it because the main report's `Covering Tests` section does not include test errors or logs. `Test File Analysis` links it when the main report omits additional tests. Read `references/file-tests.md` when you need the full file-tests report format.
 
-The linked [File Tests](./references/file-tests.md) and [`.wcov`](./references/wcov.md) artifacts can be large. Prefer targeted search instead of reading a full artifact. For example, to find a test in `file-tests.md`:
+Generated `File Tests` and `.wcov` artifacts can be large. Prefer targeted search instead of reading a full artifact. For example, to find a test in `file-tests.md`:
 
 ```sh
 grep -Pzo '(?sm)^### [^\n]*generates severe heat alert[^\n]*\n.*?(?=^### |^## |\z)' file-tests.md | tr '\0' '\n'

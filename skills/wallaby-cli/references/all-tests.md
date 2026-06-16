@@ -66,8 +66,8 @@ Format details:
 - In each log entry, `- loc:` and the fenced log message block are always present. `- context:` is optional.
 - `#### Covered Files` optional, lists the source files Wallaby recorded as covered by the test.
 
-Important differences from [failing-tests.md](./failing-tests.md):
+Important differences from `failing-tests.md`:
 
 - `all-tests.md` includes passed, failed, skipped, todo, and disabled tests.
 - Failed tests still show `- status: failed`, but this report omits inline assertion details, error messages, expected/actual values, snapshots, and stack traces.
-- Use [failing-tests.md](./failing-tests.md) or the main report when failure diagnostics are needed instead of inventory.
+- Read `failing-tests.md` or use the main report when failure diagnostics are needed instead of inventory.

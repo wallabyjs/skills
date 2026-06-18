@@ -77,7 +77,7 @@ grep -Pzo '(?sm)^## src/temperature\.ts[^\n]*\n.*?(?=^## |\z)' coverage.md | tr 
 
 Use `npx -y @wallabyjs/cli inspect ...` to inspect a variable or expression at runtime. It is useful for debugging test errors, analyzing assertions, and understanding test behavior. The command evaluates the expression in every test execution context that reaches the selected source location, so one expression can produce many runtime values. Prefer using the command instead of adding manual `console.log` statements because it is more efficient.
 
-The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y @wallabyjs/cli run --skill`, then use `inspect` for follow-up debugging.
+The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y @wallabyjs/cli run --skill`, then use `inspect` for follow-up debugging. If `--config` was provided for `run`, it must also be provided for `inspect`.
 
 Pass one or more inspection targets, each with a file path, a source location, and an expression. Multiple inspection targets can be included in the same command by passing additional inspection targets as separate arguments. The source location can be a code fragment, a line number, or a line and column. For example, to inspect the value of the `alerts` variable in `src/alerts.ts`:
 
@@ -142,7 +142,7 @@ grep -Pzo '(?sm)^## [^\n]*\n.*?^- name: .*combined conditions.*\n.*?(?=^## |\z)'
 
 Use `analyze` when a run report points to a test or file that needs deeper investigation. The command reads Wallaby's current results and full coverage information, then prints a Markdown report for one of two analysis types: test analysis for one executed test, or file analysis for a whole source file, a whole test file, or a specific source-file location.
 
-The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y @wallabyjs/cli run --skill`, then use `analyze` for follow-up analysis.
+The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y @wallabyjs/cli run --skill`, then use `analyze` for follow-up debugging. If `--config` was provided for `run`, it must also be provided for `analyze`.
 
 If `analyze` cannot resolve the requested target, the command exits with a non-zero code and prints an error message instead of a report. This includes invalid paths, missing files, a test target path that is not a test file, a missing test name, or a source file location that cannot be resolved.
 
@@ -213,5 +213,5 @@ Wallaby usually stops automatically when the agent session ends, so agents norma
 
 ```sh
 npx -y @wallabyjs/cli stop
-npx -y @wallabyjs/cli stop --config ./wallaby.js
+npx -y @wallabyjs/cli stop --config ./wallaby.js # if `--config` was provided for `run`, it must also be provided for `stop`.
 ```

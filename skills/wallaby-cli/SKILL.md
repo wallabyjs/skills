@@ -4,7 +4,7 @@ description: Run project tests, check test status, and debug failing tests using
 compatibility: Requires Node.js
 metadata:
   author: Wallaby.js
-  version: "1.1"
+  version: "2.0"
 ---
 
 # Wallaby CLI Skill
@@ -25,21 +25,21 @@ Wallaby.js runs JavaScript and TypeScript tests and provides real-time results. 
 
 ### Run command
 
-Use `npx -y @wallabyjs/cli run --skill` as the default command for project-wide test verification. Prefer this command to `npm test` commands that call `vitest`, `jest`, `ng`, etc., and run those only if the user specifically asks for them. With no test file paths, the command reports the project-wide test state. On first use, it starts a Wallaby instance and keeps it running after the command finishes. Wallaby then continues running tests in the background as files change, so follow-up runs are faster because results are already cached.
+Use `npx -y --package @wallabyjs/cli wallaby-skill run` as the default command for project-wide test verification. Prefer this command to `npm test` commands that call `vitest`, `jest`, `ng test`, etc., and run those only if the user specifically asks for them. With no test file paths, the command reports the project-wide test state. On first use, it starts a Wallaby instance and keeps it running after the command finishes. Wallaby then continues running tests in the background as files change, so follow-up runs are faster because results are already cached.
 
-The command also accepts specific test file paths as arguments: `npx -y @wallabyjs/cli run --skill ./src/feature-a.spec.ts ./src/feature-b.spec.ts`. If Wallaby is already running in project mode, calling the command with specific test file paths still reports project-wide results, but it prioritizes failures from the requested files. If Wallaby is not running, the command starts a new instance in exclusive mode, meaning Wallaby runs and reports only the specified test files. To add more test files to an active exclusive instance, run the command again with those paths. To return to project mode and run the full project, run the command again without test file paths.
+The command also accepts specific test file paths as arguments: `npx -y --package @wallabyjs/cli wallaby-skill run ./src/feature-a.spec.ts ./src/feature-b.spec.ts`. If Wallaby is already running in project mode, calling the command with specific test file paths still reports project-wide results, but it prioritizes failures from the requested files. If Wallaby is not running, the command starts a new instance in exclusive mode, meaning Wallaby runs and reports only the specified test files. To add more test files to an active exclusive instance, run the command again with those paths. To return to project mode and run the full project, run the command again without test file paths.
 
-Use `--config` to point to a specific project Wallaby config file. Always include `--skill` so the instance stays running for follow-up runs. Use `--rerun` only when test results depend on an external file or state that Wallaby does not watch, such as a database update or generated file outside the project's file set.
+Use `--config` to point to a specific project Wallaby config file. Use `--rerun` only when test results depend on an external file or state that Wallaby does not watch, such as a database update or generated file outside the project's file set.
 
 ```sh
-npx -y @wallabyjs/cli run --skill # runs all project tests if needed and reports project-wide test results
-npx -y @wallabyjs/cli run --skill --config ./wallaby.js # runs all project tests if needed and reports project-wide test results using the specified config file
-npx -y @wallabyjs/cli run --skill ./src/feature-a.spec.ts ./src/feature-b.spec.ts # runs the specified test files
-npx -y @wallabyjs/cli run --skill ./src/feature-a.spec.ts --test "feature-a / should match the expected value" # runs the specified test in the specified file
-npx -y @wallabyjs/cli run --skill --snapshots ./src/feature-a.spec.ts ./src/feature-b.spec.ts # updates snapshots for the specified test files, or for all tests if no files are given
-npx -y @wallabyjs/cli run --skill --snapshots ./src/feature-a.spec.ts --test "feature-a / should match the expected snapshots" # updates snapshots for the named test in the specified file
-npx -y @wallabyjs/cli run --update # updates Wallaby to the latest version, then runs all project tests and reports project-wide test results; use when the CLI reports compatibility errors
-npx -y @wallabyjs/cli run --help # shows help for the run command
+npx -y --package @wallabyjs/cli wallaby-skill run # runs all project tests if needed and reports project-wide test results
+npx -y --package @wallabyjs/cli wallaby-skill run --config ./wallaby.js # runs all project tests if needed and reports project-wide test results using the specified config file
+npx -y --package @wallabyjs/cli wallaby-skill run ./src/feature-a.spec.ts ./src/feature-b.spec.ts # runs the specified test files
+npx -y --package @wallabyjs/cli wallaby-skill run ./src/feature-a.spec.ts --test "feature-a / should match the expected value" # runs the specified test in the specified file
+npx -y --package @wallabyjs/cli wallaby-skill run --snapshots ./src/feature-a.spec.ts ./src/feature-b.spec.ts # updates snapshots for the specified test files, or for all tests if no files are given
+npx -y --package @wallabyjs/cli wallaby-skill run --snapshots ./src/feature-a.spec.ts --test "feature-a / should match the expected snapshots" # updates snapshots for the named test in the specified file
+npx -y --package @wallabyjs/cli wallaby-skill run --update # updates Wallaby to the latest version, then runs all project tests and reports project-wide test results; use when the CLI reports compatibility errors
+npx -y --package @wallabyjs/cli wallaby-skill run --help # shows help for the run command
 ```
 
 The command prints a Markdown report like this; a non-zero exit code usually means the report contains failing tests or errors, though it may also mean the CLI or Wallaby itself failed:
@@ -75,14 +75,14 @@ grep -Pzo '(?sm)^## src/temperature\.ts[^\n]*\n.*?(?=^## |\z)' coverage.md | tr 
 
 ### Inspect command
 
-Use `npx -y @wallabyjs/cli inspect ...` to inspect a variable or expression at runtime. It is useful for debugging test errors, analyzing assertions, and understanding test behavior. The command evaluates the expression in every test execution context that reaches the selected source location, so one expression can produce many runtime values. Prefer using the command instead of adding manual `console.log` statements because it is more efficient.
+Use `inspect` to inspect a variable or expression at runtime. It is useful for debugging test errors, analyzing assertions, and understanding test behavior. The command evaluates the expression in every test execution context that reaches the selected source location, so one expression can produce many runtime values. Prefer using the command instead of adding manual `console.log` statements because it is more efficient.
 
-The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y @wallabyjs/cli run --skill`, then use `inspect` for follow-up debugging. If `--config` was provided for `run`, it must also be provided for `inspect`.
+The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y --package @wallabyjs/cli wallaby-skill run`, then use `inspect` for follow-up debugging. If `--config` was provided for `run`, it must also be provided for `inspect`.
 
 Pass one or more inspection targets, each with a file path, a source location, and an expression. Multiple inspection targets can be included in the same command by passing additional inspection targets as separate arguments. The source location can be a code fragment, a line number, or a line and column. For example, to inspect the value of the `alerts` variable in `src/alerts.ts`:
 
 ```sh
-npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{fragment:'const alerts: WeatherAlert[] = [];'},expression:'alerts'}" "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}"
+npx -y --package @wallabyjs/cli wallaby-skill inspect "{path:'src/alerts.ts',location:{fragment:'const alerts: WeatherAlert[] = [];'},expression:'alerts'}" "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}"
 ```
 
 With fragment-based locations, the fragment acts as both file-search criteria and the containing snippet used to locate the expression inside the file. Fragment-based locations are often a better fit for LLM/code agents because no line-number calculation is required.
@@ -90,32 +90,32 @@ With fragment-based locations, the fragment acts as both file-search criteria an
 A base64-encoded `fragment` avoids escaping special characters and newlines in multi-line fragments. The CLI decodes the fragment before searching the file:
 
 ```sh
-npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{fragment:'Ly8gdW5pcXVlIGNvZGUgZnJhZ21lbnQKY29uc3QgYWxlcnRzOiBXZWF0aGVyQWxlcnRbXSA9IFtdOw=='},expression:'alerts'}"
+npx -y --package @wallabyjs/cli wallaby-skill inspect "{path:'src/alerts.ts',location:{fragment:'Ly8gdW5pcXVlIGNvZGUgZnJhZ21lbnQKY29uc3QgYWxlcnRzOiBXZWF0aGVyQWxlcnRbXSA9IFtdOw=='},expression:'alerts'}"
 ```
 
 If the line number is known, use it instead of a fragment:
 
 ```sh
-npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}"
+npx -y --package @wallabyjs/cli wallaby-skill inspect "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}"
 ```
 
 If several occurrences of the expression are near the same line, add a column number to pick the closest match:
 
 ```sh
-npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{line:134,column:10},expression:'alerts'}"
+npx -y --package @wallabyjs/cli wallaby-skill inspect "{path:'src/alerts.ts',location:{line:134,column:10},expression:'alerts'}"
 ```
 
 To show only values produced by tests with a matching name in the main report, pass `--test` with the full or partial test name:
 
 ```sh
-npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}" --test "alerts output / combined conditions"
+npx -y --package @wallabyjs/cli wallaby-skill inspect "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}" --test "alerts output / combined conditions"
 ```
 
 To clear all previously captured runtime values, pass `--clear`:
 
 ```sh
-npx -y @wallabyjs/cli inspect "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}" --clear # clears all captured runtime values and adds new inspection
-npx -y @wallabyjs/cli inspect --clear # clears all captured runtime values
+npx -y --package @wallabyjs/cli wallaby-skill inspect "{path:'src/alerts.ts',location:{line:134},expression:'alerts'}" --clear # clears all captured runtime values and adds new inspection
+npx -y --package @wallabyjs/cli wallaby-skill inspect --clear # clears all captured runtime values
 ```
 
 When `--clear` is used without inspection targets, the command prints `Cleared all captured runtime values.` instead of a Markdown report.
@@ -142,7 +142,7 @@ grep -Pzo '(?sm)^## [^\n]*\n.*?^- name: .*combined conditions.*\n.*?(?=^## |\z)'
 
 Use `analyze` when a run report points to a test or file that needs deeper investigation. The command reads Wallaby's current results and full coverage information, then prints a Markdown report for one of two analysis types: test analysis for one executed test, or file analysis for a whole source file, a whole test file, or a specific source-file location.
 
-The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y @wallabyjs/cli run --skill`, then use `analyze` for follow-up debugging. If `--config` was provided for `run`, it must also be provided for `analyze`.
+The command only works when Wallaby is already running for the same project and config. Start it first with `npx -y --package @wallabyjs/cli wallaby-skill run`, then use `analyze` for follow-up debugging. If `--config` was provided for `run`, it must also be provided for `analyze`.
 
 If `analyze` cannot resolve the requested target, the command exits with a non-zero code and prints an error message instead of a report. This includes invalid paths, missing files, a test target path that is not a test file, a missing test name, or a source file location that cannot be resolved.
 
@@ -151,7 +151,7 @@ If `analyze` cannot resolve the requested target, the command exits with a non-z
 Use `--target test` to analyze one executed test. Pass a target object with the test file path and test name:
 
 ```sh
-npx -y @wallabyjs/cli analyze --target="test" "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}"
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="test" "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}"
 ```
 
 Test analysis explains one test's execution. The main report includes:
@@ -173,13 +173,13 @@ Use `--target file` to analyze one file. Pass a target object with the file path
 Add a `location` when you need tests that cover a specific line or a specific line and column. If you know the line and expression but not the column, pass `line` and `expression`; Wallaby resolves the column. If you know a source fragment and expression, pass `fragment` and `expression`; Wallaby resolves the line and column. A base64-encoded `fragment` avoids escaping special characters and newlines in multi-line fragments. The CLI decodes the fragment before searching the file.
 
 ```sh
-npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts'}" # analyzes the whole source file with no location
-npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts'}" --test "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}" # analyzes the whole source file with no location and filters to the exact test
-npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts',location:{line:10}}" # analyzes the specified location in the source file by line number
-npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts',location:{line:10,expression:'celsius'}}" # analyzes the specified location in the source file by line number, using the expression to resolve the column
-npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts',location:{line:10,column:10}}" # analyzes the specified location in the source file by line and column numbers
-npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts',location:{fragment:'return (celsius * 9) / 5 + 32;',expression:'celsius'}}" # analyzes the specified location in the source file by fragment search, using the expression to resolve the line and column in the first fragment match
-npx -y @wallabyjs/cli analyze --target="file" "{path:'src/temperature.ts',location:{fragment:'cmV0dXJuIChjZWxzaXVzICogOSkgLyA1ICsgMzI7',expression:'celsius'}}" # analyzes the specified location in the source file by base64-encoded fragment search, using the expression to resolve the line and column in the first fragment match
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="file" "{path:'src/temperature.ts'}" # analyzes the whole source file with no location
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="file" "{path:'src/temperature.ts'}" --test "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}" # analyzes the whole source file with no location and filters to the exact test
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{line:10}}" # analyzes the specified location in the source file by line number
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{line:10,expression:'celsius'}}" # analyzes the specified location in the source file by line number, using the expression to resolve the column
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{line:10,column:10}}" # analyzes the specified location in the source file by line and column numbers
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{fragment:'return (celsius * 9) / 5 + 32;',expression:'celsius'}}" # analyzes the specified location in the source file by fragment search, using the expression to resolve the line and column in the first fragment match
+npx -y --package @wallabyjs/cli wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{fragment:'cmV0dXJuIChjZWxzaXVzICogOSkgLyA1ICsgMzI7',expression:'celsius'}}" # analyzes the specified location in the source file by base64-encoded fragment search, using the expression to resolve the line and column in the first fragment match
 ```
 
 File analysis explains the tests related to one source or test file, or to a specific source file location. The main report includes:
@@ -212,6 +212,6 @@ grep -n 'alerts.push({' src-alerts.ts.wcov
 Wallaby usually stops automatically when the agent session ends, so agents normally do not need to stop it manually. Use `stop` only when the user asks for it or when it is necessary, for example to restart Wallaby cleanly with a different config or to release the running instance immediately.
 
 ```sh
-npx -y @wallabyjs/cli stop
-npx -y @wallabyjs/cli stop --config ./wallaby.js # if `--config` was provided for `run`, it must also be provided for `stop`.
+npx -y --package @wallabyjs/cli wallaby-skill stop
+npx -y --package @wallabyjs/cli wallaby-skill stop --config ./wallaby.js # if `--config` was provided for `run`, it must also be provided for `stop`.
 ```

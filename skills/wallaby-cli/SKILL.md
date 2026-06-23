@@ -30,6 +30,10 @@ If `@wallabyjs/cli` is installed as a project dependency, invoke the `wallaby-sk
 - `yarn exec wallaby-skill ...`
 - `bun run wallaby-skill ...`
 
+If `@wallabyjs/cli` is installed globally and `wallaby-skill` is available on `PATH`, call it directly:
+
+- `wallaby-skill ...`
+
 If the package is not installed, choose the auto-install command for the project's package manager. These commands invoke the `wallaby-skill` binary, require network access, and download the package from the npm registry:
 
 - `npx -y --package @wallabyjs/cli wallaby-skill ...`

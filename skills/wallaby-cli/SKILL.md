@@ -11,6 +11,10 @@ metadata:
 
 Wallaby.js runs JavaScript and TypeScript tests and provides real-time results. This skill uses the Wallaby CLI to run tests, check test status, and debug failing tests. It generates detailed Markdown reports with test results, errors, logs, and coverage information.
 
+## Environment Requirements
+
+Ensure the coding agent, such as Codex, has read and write access to `~/.wallaby` before using the Wallaby CLI.
+
 ## When to Use
 
 - **After code changes** - Verify tests pass after modifications

@@ -4,7 +4,7 @@ description: Run, verify, and investigate JavaScript, TypeScript, and Python tes
 compatibility: Requires Node.js
 metadata:
   author: Wallaby.js
-  version: "2.2"
+  version: "3.0"
 ---
 
 Wallaby keeps JavaScript, TypeScript, and Python tests live and queryable throughout a coding task. It runs affected tests as files change and keeps current results, coverage, and execution data available, so an agent can inspect what the code did instead of reconstructing it from terminal output.
@@ -51,6 +51,8 @@ Otherwise, use the one-off install command for the project's package manager. Ea
 
 The examples below use the npm prefix `npx wallaby-skill` for consistency. Before executing an example in a pnpm, Yarn, or Bun project, replace only that prefix with the corresponding form above; keep the Wallaby subcommand and its arguments unchanged.
 
+Every subcommand supports `--help`. Append it to a command to see its current usage and options, for example `npx wallaby-skill run --help`.
+
 ### Run command
 
 Use `run` to start or query a persistent Wallaby test session. Without `--config`, Wallaby identifies the project by the directory in which the command runs. With `--config`, it identifies the project by the specified Wallaby configuration file. Keep the same working directory or `--config` value on later calls to reuse the running session and its live results.
@@ -62,7 +64,7 @@ When Wallaby is not yet running for the project, the first `run` call establishe
 - With no test file paths, Wallaby starts in project mode and runs and watches the entire project.
 - With one or more test file paths, Wallaby starts in exclusive mode and runs and watches only those test files.
 
-A cold project-mode start must complete an initial full test run, and a project-wide `--rerun` schedules every test again. Either can take substantial time on a large suite. Before starting or forcing project-wide work, use `run` with one known relevant test file as a low-cost probe. The probe never triggers a cold full-project run. If it starts an exclusive session or adds the file to an existing exclusive scope, Wallaby runs only that narrow scope, which is much cheaper than a project-wide run on a large suite. Read `Mode` in the Markdown output, which Wallaby also saves as `run.md`. `Mode: project` proves that a project-mode session was already running because a cold file-scoped call starts in exclusive mode. In this case, the probe reads current state without scheduling another run. Use its `Total` and `Time` values to estimate the likely cost of a project-wide rerun. `Mode: exclusive` means Wallaby is now running in exclusive mode, and any new test execution remains within that scope. To estimate the cost of switching from exclusive mode to project mode, follow an absolute report link from the probe to its timestamped directory, then inspect retained sibling directories for the most recent `run.md` with `Mode: project`. Use that report's `Total` and `Time` values to estimate the likely cost of a project-wide start. When the available values indicate a large suite, keep the smallest relevant test files in exclusive mode unless the current task requires project-wide coverage or full-suite verification.
+A cold project-mode start must complete an initial full test run, and a project-wide `--rerun` schedules every test again. Either can take substantial time on a large suite. Before starting or forcing project-wide work, call `run --check` only when you do not know whether Wallaby is already running for the project. Skip this check when you have already called `run` for the same project identity. If Wallaby is active for the project, `run --check` returns its current report without launching an instance, running tests, or changing the session's mode or scope. If Wallaby is not active or cannot be reached, it exits with `Wallaby is not running for the specified project.` and does not launch it. Read `Mode` in the returned report. In project mode, use `Total` and `Time` to estimate the likely cost of a project-wide rerun. In exclusive mode, those values cover only the active scope. To estimate project-wide cost from an exclusive session, follow an absolute report link to its timestamped directory, then inspect retained sibling directories for the most recent `run.md` with `Mode: project`. When no reliable project-wide values exist, or they indicate a large suite, start or keep the smallest relevant test files in exclusive mode unless the task requires project-wide coverage or full-suite verification.
 
 Later `run` calls reuse that same session:
 
@@ -72,9 +74,11 @@ Later `run` calls reuse that same session:
 
 Wallaby keeps the session running after each command and updates affected test results as files change. If `run` is called while affected tests are still executing, it waits for Wallaby to become idle before producing the report. Any file changes made while it waits schedule their affected tests and extend the wait until Wallaby is idle again. The returned report therefore includes those changes instead of mixing completed results with a test run still in progress.
 
+Default to omitting `--rerun`. After an ordinary edit to a source file, test file, or watched configuration, call `run` with the affected test file and optional exact `--test` name. Wallaby detects the edit, reruns affected tests automatically, and waits for the live session to become idle before returning current results. When a test trace is needed, call `analyze --target=test` directly; test analysis performs its own targeted traced run. A recent edit, final verification, or timing measurement does not make live results stale.
+
 For a long initial or project-wide run, start `run` in a subagent or background terminal and continue working. Wallaby picks up changes made while the command is running, and their affected tests complete before the command returns. Wait for the delegated or background command to finish before using its report as the verification result.
 
-Use `--rerun` when the current results may be stale because relevant external state changed or Wallaby did not detect an expected change. Scope a forced rerun to the smallest known affected test set: pass test file paths to rerun only those files, and add `--test` when only one named test needs to rerun. A targeted `--rerun` works in project mode without rerunning the rest of the project or changing the session to exclusive mode. Omit test file paths only when the entire project needs a forced rerun.
+Use `--rerun` as recovery after identifying stale live state. Valid reasons are relevant external state that Wallaby cannot watch, or an observed failure to rerun after an expected watched change. State the reason before forcing execution. Scope recovery to the smallest known affected test set: pass test file paths to rerun only those files, and add `--test` when only one named test needs to rerun. A targeted `--rerun` works in project mode without rerunning the rest of the project or changing the session to exclusive mode. Omit test file paths only when evidence shows that the entire project's live results are stale.
 
 Use `--snapshots` after confirming that snapshot failures represent intended output changes. Scope the update to the affected tests: pass test file paths to update snapshots only for those files, and add `--test` to update snapshots for one named test. In project mode, a targeted snapshot update leaves the session in project mode and does not update snapshots from other tests. Omit test file paths only when snapshots across the entire project should be updated. If Wallaby is not running yet, the first-run mode rules above still apply.
 
@@ -82,18 +86,15 @@ To target one test with `--test`, pass exactly one test file and the test's exac
 
 ```sh
 npx wallaby-skill run # starts or reuses project mode and reports project-wide test results
+npx wallaby-skill run --check # returns the current report only when Wallaby is already running; does not launch or run tests
 npx wallaby-skill run --config ./wallaby.js # starts or reuses project mode identified by the specified config file
-npx wallaby-skill run ./src/feature-a.spec.ts # starts or extends exclusive scope, or reads this file's results in project mode; can also probe the current mode
+npx wallaby-skill run ./src/feature-a.spec.ts # starts or extends exclusive scope, or reads this file's results in project mode
 npx wallaby-skill run ./src/feature-a.spec.ts ./src/feature-b.spec.ts # starts exclusive mode if needed, or reads their results according to the active mode
-npx wallaby-skill run ./src/feature-a.spec.ts --test "feature-a / should match the expected value" # targets this exact full test name within one file
-npx wallaby-skill run --rerun ./src/feature-a.spec.ts # forces only this test file to rerun, including in project mode
-npx wallaby-skill run --rerun ./src/feature-a.spec.ts --test "feature-a / should match the expected value" # forces only the named test to rerun
-npx wallaby-skill run --rerun # forces a project-wide rerun; use only when results may be stale across the project
+npx wallaby-skill run ./src/feature-a.spec.ts --test "feature-a / should match the expected value" # reads this exact test after any automatic affected-test run finishes
+npx wallaby-skill run --rerun ./src/feature-a.spec.ts # forces this test file to rerun after observing stale results; add --test with the exact full name to rerun one test
 npx wallaby-skill run --snapshots ./src/feature-a.spec.ts ./src/feature-b.spec.ts # updates snapshots only for the specified test files
 npx wallaby-skill run --snapshots ./src/feature-a.spec.ts --test "feature-a / should match the expected snapshots" # updates snapshots for the named test in the specified file
 npx wallaby-skill run --snapshots # updates snapshots across the project; use only when every snapshot change is intended
-npx wallaby-skill run --update # updates Wallaby to the latest version before running; use when the CLI reports a compatibility error
-npx wallaby-skill run --help # shows help for the run command
 ```
 
 The command prints a concise Markdown report and saves the same content as `run.md`. When a report is produced, exit code `0` corresponds to `Status: succeeded`; exit code `1` corresponds to `Status: failed`. The status is failed when at least one test failed, Wallaby has a fatal run error, or global errors exist. CLI startup, connection, and compatibility failures also exit with code `1`, but may print an error instead of producing a report.
@@ -147,7 +148,7 @@ If `analyze` cannot resolve the requested target, the command exits with a non-z
 
 #### Test analysis
 
-Use `--target test` when one test fails, passes unexpectedly, produces surprising errors or logs, or when you need to understand its impact: which source lines it covers and how it executes them. Its primary output is the `Test Execution Trace`, which records executed source lines in order across every file involved. It includes imported modules, setup, and helpers, marks the start of the selected test, and continues through each source line the test reaches. Follow it to see the test's actual control flow line by line instead of inferring it from errors, logs, or stack traces.
+Use `--target test` when a test's execution order or cross-file control flow is needed to explain a failure, unexpected pass, surprising error, log, or behavior. Its primary output is the `Test Execution Trace`, which records executed source lines in order across every file involved. It includes imported modules, setup, and helpers, marks the start of the selected test, and continues through each source line the test reaches. Test analysis reruns the selected test with tracing enabled, so use it only when you will inspect the generated trace. Use test-filtered file analysis for test-scoped coverage without a traced rerun. Read the latest run report or use test-file analysis when you only need current status, timing, logs, or covered-file names.
 
 The trace is paired with test-scoped `.wcov` artifacts for every source file covered by the test. Each artifact preserves the complete source and marks every coverable line as `full`, `partial`, or `none`; partially covered lines identify the exact uncovered column ranges and expressions. Read the trace to see what ran and in what order. Read the `.wcov` artifacts to see which lines and expression ranges were fully, partially, or never executed, including uncovered expressions in branches the test did not take.
 
@@ -173,7 +174,7 @@ grep -n -B 20 -A 5 'test starts here' test-trace.md
 
 #### File analysis
 
-Use `--target file` when a source or test file needs to be understood before editing, when a coverage gap needs to be located, or when you need to choose the tests and verification scope for a change. Its primary output is a `.wcov` artifact that preserves the complete file with coverage annotations beside the source. Use it to see which coverable lines and expression ranges are fully, partially, or never executed. Analyze an exact source location to identify the tests that reach that code. The report also provides related test statuses, timings, and file metrics as supporting context. This evidence helps decide what to change, which tests to inspect, run, or add, and how broadly to verify the result.
+Use `--target file` when a source or test file needs to be understood before editing, when a coverage gap needs to be located, or when you need to choose the tests and verification scope for a change. Its primary output is a `.wcov` artifact that preserves the complete file with coverage annotations beside the source. Use it with `--test` when test-scoped coverage or details for one exact test are needed without a Test Execution Trace. Analyze an exact source location to identify the tests that reach that code. The report also provides related test statuses, timings, and file metrics as supporting context. This evidence helps decide what to change, which tests to inspect, run, or add, and how broadly to verify the result.
 
 Unlike test analysis, file analysis never schedules or reruns a test. It queries the current results, coverage, and file data already retained by Wallaby, so the report is produced immediately when the session is idle. If affected tests are already running, the command waits for Wallaby to become idle so the data remains consistent, then returns the detailed report without starting more test work.
 
@@ -302,4 +303,12 @@ Use `stop` explicitly when the running process must be replaced or released:
 ```sh
 npx wallaby-skill stop # stops the session identified by the current working directory
 npx wallaby-skill stop --config ./wallaby.js # stops the session identified by this Wallaby configuration file
+```
+
+### Update command
+
+When `run` reports a Wallaby Core compatibility error, update Core, then retry the same `run` command:
+
+```sh
+npx wallaby-skill update
 ```

@@ -1,12 +1,10 @@
-# File Tests report
+# File-analysis test artifacts
 
-The report starts with a fixed top-level heading:
+`analyze --target=file` keeps its terminal response compact by writing the complete related-test inventory to a separate Markdown artifact. The main report links it as `Covering Tests` for a source file or `Tests` for a test file and shows its size. The generated file name is derived from the analyzed path by replacing path separators with `-` and appending `.md`; for example, `src/core.ts` becomes `src-core.ts.md`.
 
-```md
-# Tests
-```
+Open this artifact only when the related test identities or details are needed. The test count and other file metrics are already present in the main report. For a large artifact, search for the relevant test name or field instead of reading the whole file.
 
-After the heading, the report starts with analysis metadata:
+Both artifact variants start with analysis metadata:
 
 ```md
 - path: <target-file-path>
@@ -30,30 +28,48 @@ Format details:
 - `- lines:`, `- coverage:`, `- change risk anti-patterns:`, and `- size:` appear when Wallaby has those values for the target.
 - Source-file analysis can include coverage and change-risk metrics. Test-file analysis usually includes line count and size.
 
-When tests are present and no exact filter is applied, source-file and source-location analysis include ranked summaries:
+## Source-file artifact
+
+The `Covering Tests` link for a source file uses this shape:
 
 ```md
+# File Analysis
+
+- path: <source-file-path>
+- tests: <count>
+- lines: <line-count>
+- coverage: <percent>%
+- change risk anti-patterns: <number>
+- size: <size>
+
+## Covering Tests
+
+### <test name>
+- status: passed|failed|skipped|todo|disabled
+- loc: <test-file-path>:<line>
+- time: <time>ms
+```
+
+The inventory is a flat sequence of all tests that cover the source target. It is not grouped by test file. Each entry contains the fields available for that test; status is always present, while location and time depend on runner data.
+
+## Test-file artifact
+
+The `Tests` link for a test file uses this shape:
+
+````md
+# Test File Analysis
+
+- path: <test-file-path>
+- tests: <count>
+- lines: <line-count>
+- size: <size>
+
 Top 5 tests by execution time:
 - <test name> (<time>ms, <test-file-path>:<line>)
 - ...
 
-Top 5 files by execution time:
-- <test-file-path> (<total-time>ms, <test-count> tests)
-- ...
+## Tests
 
-Top 5 files by test count:
-- <test-file-path> (<test-count> tests, <total-time>ms)
-- ...
-```
-
-Test-file analysis includes the top tests by execution time, but omits the file-count summaries because every listed test belongs to the analyzed test file.
-
-Filtered file analysis omits the ranked summaries and lists only the matching test.
-
-The rest of the report lists tests grouped by test file:
-
-````md
-## <test-file-path>
 ### <test name>
 - status: passed|failed|skipped|todo|disabled
 - loc: <test-file-path>:<line>
@@ -79,13 +95,11 @@ Stack trace:
 - ...
 ````
 
-This test-entry format uses the same test fields as the Failing Tests and All Tests reports, with fields shown when the formatter includes data for them.
+The ranked section is omitted when no ranking is available. Test entries are not grouped by file because every listed test belongs to the analyzed test file. Entry fields are shown when the formatter has data for them; `Covered Files` identifies the source files reached by each test.
 
-The main analyze report may show a shorter test list:
+## Filters and locations
 
-- Source-file analysis shows all related tests, but omits test errors, logs, and covered files from the inline `Covering Tests` list. Open `file-tests.md` for the full test entries.
-- Test-file analysis shows up to five tests inline and links to `file-tests.md` when additional tests are omitted.
-- Filtered file analysis shows the matching test inline with full details and still links to `file-tests.md`.
+When `--test` or `target.test` filters file analysis, the metadata records the filter and the artifact lists only the matching test. A resolved source location appears in metadata as `- location: line <line>, column <column>`. Filtered analysis omits ranked summaries.
 
 If no tests are found, the report contains metadata followed by:
 

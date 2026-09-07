@@ -1,10 +1,9 @@
 ---
 name: wallaby-cli
 description: Run, verify, and investigate JavaScript, TypeScript, and Python tests through Wallaby's live test state. Use for test execution or status checks, baselines before editing, post-change verification, diagnosing failures or unexpected behavior, analyzing coverage or assertions, tracing execution, inspecting runtime values or logs, assessing file or test impact, and updating snapshots. Also use when the user mentions Wallaby or a conventional test framework or command such as Vitest, Jest, Jasmine, Mocha, ng test, pytest, unittest, or npm test.
-compatibility: Requires Node.js
 metadata:
   author: Wallaby.js
-  version: "3.0"
+  version: "3.1"
 ---
 
 Wallaby keeps JavaScript, TypeScript, and Python tests live and queryable throughout a coding task. It runs affected tests as files change and keeps current results, coverage, and execution data available, so an agent can inspect what the code did instead of reconstructing it from terminal output.
@@ -16,7 +15,7 @@ Use that live test state to:
 - Establish a baseline before editing by checking current failures, coverage, and the tests that exercise the code you plan to change.
 - Keep feedback focused while editing. Start with relevant tests, add related tests as the change surface grows, and use project-wide verification at the end when the task requires it.
 - Read coverage directly beside the complete source in a `.wcov` artifact. Every coverable line is marked `full`, `partial`, or `none`, and partially covered lines identify the exact uncovered column ranges and expressions. Filter the same view to one test to see only what that test executed and missed.
-- Analyze a source file, test file, or exact source location together with its related tests and supporting file metrics. Use line count, coverage, complexity, change risk, and test statuses and timings to decide what to change and how broadly to verify it.
+- Analyze a source file, test file, or exact source location from a compact summary, then follow its separate coverage and related-test artifacts only when needed. Use line count, coverage, complexity, change risk, and test statuses and timings to decide what to change and how broadly to verify it.
 - Analyze one executed test as a unified execution record. Follow recorded source lines in execution order across every file involved. The trace includes imported modules and setup, marks the start of the selected test, and continues through each source line the test reaches. Combine it with per-file test-scoped `.wcov` artifacts to see both the route taken and the exact lines and expressions executed or missed. The same report provides the test's status, timing, errors, logs, and covered files as supporting diagnostics.
 - Inspect multiple variables or expressions across different source locations in one request. Each value is captured in every test context that reaches its location and tied to the test that produced it. Filter the combined results to one test when narrowing the investigation. Use this runtime evidence before changing code or adding temporary logs.
 - Use project-wide coverage and test and file metrics such as timing, test count, complexity, and change risk to identify meaningful test gaps, slow or tightly coupled tests, and changes that need wider verification.
@@ -174,7 +173,7 @@ grep -n -B 20 -A 5 'test starts here' test-trace.md
 
 #### File analysis
 
-Use `--target file` when a source or test file needs to be understood before editing, when a coverage gap needs to be located, or when you need to choose the tests and verification scope for a change. Its primary output is a `.wcov` artifact that preserves the complete file with coverage annotations beside the source. Use it with `--test` when test-scoped coverage or details for one exact test are needed without a Test Execution Trace. Analyze an exact source location to identify the tests that reach that code. The report also provides related test statuses, timings, and file metrics as supporting context. This evidence helps decide what to change, which tests to inspect, run, or add, and how broadly to verify the result.
+Use `--target file` when a source or test file needs to be understood before editing, when a coverage gap needs to be located, or when you need to choose the tests and verification scope for a change. The command prints a compact summary and links to two separate artifacts: a `.wcov` view of the complete file and a Markdown inventory of the related tests. Use it with `--test` when test-scoped coverage or details for one exact test are needed without a Test Execution Trace. Analyze an exact source location to identify the tests that reach that code. This evidence helps decide what to change, which tests to inspect, run, or add, and how broadly to verify the result.
 
 Unlike test analysis, file analysis never schedules or reruns a test. It queries the current results, coverage, and file data already retained by Wallaby, so the report is produced immediately when the session is idle. If affected tests are already running, the command waits for Wallaby to become idle so the data remains consistent, then returns the detailed report without starting more test work.
 
@@ -194,15 +193,16 @@ npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{
 
 The main report includes:
 
+- `Status`, `Mode`, `Summary`, `Fatal Error`, and `Global Errors` sections with the same meanings as in the run command report.
 - `File Analysis` for a source file, or `Test File Analysis` for a test file.
-- File metadata and available analysis metrics such as path, location, test count, line count, coverage, `change risk anti-patterns`, and size, plus `Detailed File Coverage` linked to a `.wcov` artifact. The artifact contains the file content with pseudo-block comments after every source line. The comments annotate line numbers and the `full`, `partial`, or `none` state of each coverable line. Partially covered lines can include uncovered column ranges with the corresponding source expressions. Read `references/wcov.md` when you need the full `.wcov` artifact format.
-- `Covering Tests` for source files, or `Tests` for test files, with test names, statuses, locations, and execution times. Failed tests also show error messages and stack traces. Test-file analysis can show logs and covered files for each test.
-- `File Tests` links to the complete test report. `File Analysis` always links it because the main report's `Covering Tests` section does not include test errors or logs. `Test File Analysis` links it when the main report omits additional tests. Read `references/file-tests.md` when you need the full file-tests report format.
+- File metadata and available analysis metrics such as path, location, test count, line count, coverage, `change risk anti-patterns`, and size.
+- A `Covering Tests` link for a source file, or a `Tests` link for a test file, points to a separate Markdown artifact containing the complete related-test inventory. The main report does not inline that inventory. The link includes the artifact size; do not open a large test inventory unless test identities, statuses, locations, timings, logs, or covered files are needed. Search it directly when only one test or property is relevant. Read `references/file-tests.md` for the two artifact shapes.
+- `Detailed File Coverage` links to a `.wcov` artifact containing the complete file with line-level `full`, `partial`, or `none` annotations and uncovered expression ranges. Read `references/wcov.md` for its format.
 
-Generated `File Tests` and `.wcov` artifacts can be large. Prefer targeted search instead of reading a full artifact. For example, to find a test in `file-tests.md`:
+The linked test inventory and `.wcov` artifact can be large. Open the `.wcov` artifact when locating coverage gaps. Open the test inventory when selecting or investigating related tests. Prefer targeted search instead of reading either artifact in full. For example, to find one test in the linked Markdown test inventory:
 
 ```sh
-grep -Pzo '(?sm)^### [^\n]*generates severe heat alert[^\n]*\n.*?(?=^### |^## |\z)' file-tests.md | tr '\0' '\n'
+grep -Pzo '(?sm)^### [^\n]*generates severe heat alert[^\n]*\n.*?(?=^### |^## |\z)' src-alerts.ts.md | tr '\0' '\n'
 ```
 
 To find partially covered lines in a `.wcov` file:

@@ -3,7 +3,7 @@ name: wallaby-cli
 description: Run, verify, and investigate JavaScript, TypeScript, and Python tests through Wallaby's live test state. Use for test execution or status checks, baselines before editing, post-change verification, diagnosing failures or unexpected behavior, analyzing coverage or assertions, tracing execution, inspecting runtime values or logs, assessing file or test impact, and updating snapshots. Also use when the user mentions Wallaby or a conventional test framework or command such as Vitest, Jest, Jasmine, Mocha, ng test, pytest, unittest, or npm test.
 metadata:
   author: Wallaby.js
-  version: "3.1"
+  version: "3.2"
 ---
 
 Wallaby keeps JavaScript, TypeScript, and Python tests live and queryable throughout a coding task. It runs affected tests as files change and keeps current results, coverage, and execution data available, so an agent can inspect what the code did instead of reconstructing it from terminal output.
@@ -14,8 +14,9 @@ Use that live test state to:
 
 - Establish a baseline before editing by checking current failures, coverage, and the tests that exercise the code you plan to change.
 - Keep feedback focused while editing. Start with relevant tests, add related tests as the change surface grows, and use project-wide verification at the end when the task requires it.
+- Locate coverage gaps across a batch of files in one consolidated `coverage-gaps.md` report. It lists uncovered lines and partially covered expression ranges per file and links to full per-file coverage and related-test artifacts when deeper inspection is needed.
 - Read coverage directly beside the complete source in a `.wcov` artifact. Every coverable line is marked `full`, `partial`, or `none`, and partially covered lines identify the exact uncovered column ranges and expressions. Filter the same view to one test to see only what that test executed and missed.
-- Analyze a source file, test file, or exact source location from a compact summary, then follow its separate coverage and related-test artifacts only when needed. Use line count, coverage, complexity, change risk, and test statuses and timings to decide what to change and how broadly to verify it.
+- Analyze a batch of files, one source or test file, or an exact source location from a compact summary, then follow its separate coverage and related-test artifacts only when needed. Use coverage, change risk, test statuses, and timings to decide what to change and how broadly to verify it.
 - Analyze one executed test as a unified execution record. Follow recorded source lines in execution order across every file involved. The trace includes imported modules and setup, marks the start of the selected test, and continues through each source line the test reaches. Combine it with per-file test-scoped `.wcov` artifacts to see both the route taken and the exact lines and expressions executed or missed. The same report provides the test's status, timing, errors, logs, and covered files as supporting diagnostics.
 - Inspect multiple variables or expressions across different source locations in one request. Each value is captured in every test context that reaches its location and tied to the test that produced it. Filter the combined results to one test when narrowing the investigation. Use this runtime evidence before changing code or adding temporary logs.
 - Use project-wide coverage and test and file metrics such as timing, test count, complexity, and change risk to identify meaningful test gaps, slow or tightly coupled tests, and changes that need wider verification.
@@ -24,7 +25,7 @@ When a command produces a report, start with its concise Markdown output, then o
 
 ## Environment requirements
 
-In a sandbox, the CLI needs read and write access to `~/.wallaby`. It needs network access to `https://update.wallabyjs.com` when downloading or updating Wallaby, and access to the configured npm registry when `@wallabyjs/cli` is not already installed.
+In a sandbox, the CLI needs read and write access to `~/.wallaby`. It needs network access to `https://*.wallabyjs.com` when downloading or updating Wallaby, and access to the configured npm registry when `@wallabyjs/cli` is not already installed.
 
 ## Invoke the CLI
 
@@ -139,11 +140,11 @@ grep -Pzo '(?sm)^## src/temperature\.ts[^\n]*\n.*?(?=^## |\z)' coverage.md | tr 
 
 ### Analyze command
 
-Use `analyze` when a run report points to a test or file that needs deeper investigation. The command reads Wallaby's current results and full coverage information, then prints a Markdown report and saves the same content as `analyze.md`. It supports two analysis types: test analysis for one executed test, or file analysis for a whole source file, a whole test file, or a specific source-file location.
+Use `analyze` when a run report points to tests or files that need deeper investigation. The command reads Wallaby's current results and full coverage information, then prints a Markdown report and saves the same content as `analyze.md`. It supports three analysis types: test analysis for one executed test, file analysis for a whole source file, a whole test file, or a specific source-file location, and files analysis for a batch of source or test files.
 
 The command only works when Wallaby is already running for the same project identity used by `run`. Start Wallaby first in project mode, or in exclusive mode that includes the test file being analyzed or tests that cover the source file being analyzed. Then use `analyze` from the same working directory or with the same `--config` value as `run`.
 
-If `analyze` cannot resolve the requested target, the command exits with a non-zero code and prints an error message instead of a report. This includes invalid paths, missing files, a test target path that is not a test file, a missing test name, or a source file location that cannot be resolved.
+If test or single-file analysis cannot resolve the requested target, the command exits with a non-zero code and prints an error message instead of a report. This includes invalid paths, missing files, a test target path that is not a test file, a missing test name, or a source file location that cannot be resolved. Files analysis reports path-specific failures under `Files Analysis Errors` and still analyzes paths it can resolve. Confirm that every requested path has a corresponding `## File:` section before treating a batch as complete.
 
 #### Test analysis
 
@@ -202,20 +203,53 @@ The main report includes:
 The linked test inventory and `.wcov` artifact can be large. Open the `.wcov` artifact when locating coverage gaps. Open the test inventory when selecting or investigating related tests. Prefer targeted search instead of reading either artifact in full. For example, to find one test in the linked Markdown test inventory:
 
 ```sh
-grep -Pzo '(?sm)^### [^\n]*generates severe heat alert[^\n]*\n.*?(?=^### |^## |\z)' src-alerts.ts.md | tr '\0' '\n'
+grep -Pzo '(?sm)^### [^\n]*generates severe heat alert[^\n]*\n.*?(?=^### |^## |\z)' file-src@salerts.ts.md | tr '\0' '\n'
 ```
 
 To find partially covered lines in a `.wcov` file:
 
 ```sh
-grep -n 'coverage: partial' src-alerts.ts.wcov
+rg -n 'coverage: partial' file-src@salerts.ts.wcov
 ```
 
 To find a source line in a `.wcov` file:
 
 ```sh
-grep -n 'alerts.push({' src-alerts.ts.wcov
+rg -n -F 'alerts.push({' file-src@salerts.ts.wcov
 ```
+
+#### Files analysis
+
+Use `--target files` to analyze several source or test files from the same current Wallaby state and write their coverage gaps to one `coverage-gaps.md` artifact. Like single-file analysis, files analysis does not schedule or rerun tests. It waits for the running session to become idle, then queries the retained results.
+
+With no target object, or with an empty `paths` array, Wallaby automatically selects up to 20 source files with the lowest current coverage. Use this as a quick discovery shortlist, not as proof that every relevant repository file was reviewed. The selection reflects the active Wallaby scope and omits higher-coverage files that may still have valuable gaps or high change risk.
+
+Pass an explicit `paths` array when the files are already known or when the candidate set is larger than the automatic shortlist:
+
+```sh
+npx wallaby-skill analyze --target="files" # analyzes up to 20 lowest-coverage source files
+npx wallaby-skill analyze --target="files" "{paths:['src/accounts.ts','src/contracts.ts']}" # analyzes the requested files together
+```
+
+The batch target accepts file paths only. It does not support a source `location` or `--test` filter; use `--target file` when either is required.
+
+The terminal report includes the batch counts, path errors, a compact source-file table, an optional test-file table, and a `Coverage Gaps` link. For an explicit batch, the source table shows only files with gaps. If more than 20 source files have gaps, the table shows 20 prioritized entries; `coverage-gaps.md` still contains every analyzed file. Automatic selection lists every selected source file, including files with no gaps.
+
+Open `coverage-gaps.md` before deciding which tests to change. Each `## File: <path>` section reports coverage, change risk, covering-test count, and all line-level gaps, with links to that file's complete related-test inventory and `.wcov` artifact. Check `Files Analysis Errors` and confirm that every intended path appears as a file section. Read `references/coverage-gaps.md` for the complete format and navigation patterns.
+
+For a large report, locate file sections without reading it end to end:
+
+```sh
+rg -n '^## File: ' coverage-gaps.md
+rg -n -F '## File: src/accounts.ts' coverage-gaps.md
+awk -v target='src/accounts.ts' '
+  $0 == "## File: " target { found=1 }
+  found && /^## File: / && $0 != "## File: " target { exit }
+  found { print }
+' coverage-gaps.md
+```
+
+Use the listed line and column ranges to open the corresponding source and related tests. Open the linked `.wcov` artifact only when the consolidated gaps plus the source file do not provide enough context, or when the complete annotated source is needed.
 
 ### Inspect command
 

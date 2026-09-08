@@ -1,6 +1,6 @@
 # File-analysis test artifacts
 
-`analyze --target=file` keeps its terminal response compact by writing the complete related-test inventory to a separate Markdown artifact. The main report links it as `Covering Tests` for a source file or `Tests` for a test file and shows its size. The generated file name is derived from the analyzed path by replacing path separators with `-` and appending `.md`; for example, `src/core.ts` becomes `src-core.ts.md`.
+`analyze --target=file` and `analyze --target=files` keep terminal responses compact by writing each file's complete related-test inventory to a separate Markdown artifact. A report links it as `Covering Tests` for a source file or `Tests` for a test file and shows its size. The generated name starts with `file-`, escapes each `@` as `@@`, encodes `/` as `@s` and `\` as `@b`, then appends `.md`; for example, `src/core.ts` becomes `file-src@score.ts.md`.
 
 Open this artifact only when the related test identities or details are needed. The test count and other file metrics are already present in the main report. For a large artifact, search for the relevant test name or field instead of reading the whole file.
 

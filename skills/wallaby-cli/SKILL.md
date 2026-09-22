@@ -3,7 +3,7 @@ name: wallaby-cli
 description: Run, verify, and investigate JavaScript, TypeScript, and Python tests through Wallaby's live test state. Use for test execution or status checks, baselines before editing, post-change verification, diagnosing failures or unexpected behavior, analyzing coverage or assertions, tracing execution, inspecting runtime values or logs, assessing file or test impact, and updating snapshots. Also use when the user mentions Wallaby or a conventional test framework or command such as Vitest, Jest, Jasmine, Mocha, ng test, pytest, unittest, or npm test.
 metadata:
   author: Wallaby.js
-  version: "3.2"
+  version: "4.0"
 ---
 
 Wallaby keeps JavaScript, TypeScript, and Python tests live and queryable throughout a coding task. It runs affected tests as files change and keeps current results, coverage, and execution data available, so an agent can inspect what the code did instead of reconstructing it from terminal output.
@@ -14,10 +14,8 @@ Use that live test state to:
 
 - Establish a baseline before editing by checking current failures, coverage, and the tests that exercise the code you plan to change.
 - Keep feedback focused while editing. Start with relevant tests, add related tests as the change surface grows, and use project-wide verification at the end when the task requires it.
-- Locate coverage gaps across a batch of files in one consolidated `coverage-gaps.md` report. It lists uncovered lines and partially covered expression ranges per file and links to full per-file coverage and related-test artifacts when deeper inspection is needed.
-- Read coverage directly beside the complete source in a `.wcov` artifact. Every coverable line is marked `full`, `partial`, or `none`, and partially covered lines identify the exact uncovered column ranges and expressions. Filter the same view to one test to see only what that test executed and missed.
-- Analyze a batch of files, one source or test file, or an exact source location from a compact summary, then follow its separate coverage and related-test artifacts only when needed. Use coverage, change risk, test statuses, and timings to decide what to change and how broadly to verify it.
-- Analyze one executed test as a unified execution record. Follow recorded source lines in execution order across every file involved. The trace includes imported modules and setup, marks the start of the selected test, and continues through each source line the test reaches. Combine it with per-file test-scoped `.wcov` artifacts to see both the route taken and the exact lines and expressions executed or missed. The same report provides the test's status, timing, errors, logs, and covered files as supporting diagnostics.
+- Analyze a batch of files, one source or test file, or an exact source location, or a test from a compact summary, then follow its separate coverage and related-test artifacts only when needed. Use coverage, change risk, test statuses, and timings to decide what to change and how broadly to verify it.
+- Analyze one test's results and coverage across source files. Add `--trace` to rerun it and follow recorded source lines in execution order across every file involved. The trace includes imported modules and setup, marks the start of the selected test, and continues through each source line the test reaches. The same report provides the test's status, timing, errors, logs, and covered files as supporting diagnostics.
 - Inspect multiple variables or expressions across different source locations in one request. Each value is captured in every test context that reaches its location and tied to the test that produced it. Filter the combined results to one test when narrowing the investigation. Use this runtime evidence before changing code or adding temporary logs.
 - Use project-wide coverage and test and file metrics such as timing, test count, complexity, and change risk to identify meaningful test gaps, slow or tightly coupled tests, and changes that need wider verification.
 
@@ -26,6 +24,10 @@ When a command produces a report, start with its concise Markdown output, then o
 ## Environment requirements
 
 In a sandbox, the CLI needs read and write access to `~/.wallaby`. It needs network access to `https://*.wallabyjs.com` when downloading or updating Wallaby, and access to the configured npm registry when `@wallabyjs/cli` is not already installed.
+
+Wallaby's background process must remain alive and reachable between CLI calls. Each later call needs to discover the same process by its PID and connect to the local port established at startup. Some sandboxed agent runtimes isolate individual shell-tool executions: sharing a working directory and filesystem does not guarantee shared process visibility or local network access. A successful `run` can therefore be followed by `Wallaby is not running` or `Failed to attach` from a separate execution, even while the original instance remains active.
+
+Before the first Wallaby command, choose an execution context that stays alive between shell commands, then reuse that same context for every Wallaby CLI call throughout the task. If a query cannot attach after a successful start, retry it in the original execution context before attempting another start. Keep the configured sandbox permissions.
 
 ## Invoke the CLI
 
@@ -53,18 +55,32 @@ The examples below use the npm prefix `npx wallaby-skill` for consistency. Befor
 
 Every subcommand supports `--help`. Append it to a command to see its current usage and options, for example `npx wallaby-skill run --help`.
 
+Use `grep`, `sed`, `ripgrep`, or similar tools for targeted reads, depending on your platform and which tools are available. All examples use ripgrep (`rg`).
+
+### Output redirection
+
+Redirect Wallaby command stdout and stderr to a temporary file only when you will filter it for the sections needed by the current question. Chain the filtered read on the same line, in the same tool call, to save tokens and model round trips. When you need the full report, read command output directly; redirecting it only to print the whole file with `cat` provides no benefit. For example, in a POSIX shell, run tests and immediately extract the status, test counts, and error diagnostics:
+
+```sh
+npx wallaby-skill run >| /tmp/wallaby-output.log 2>&1; rg --no-line-number -U --pcre2 -o '(?sm)^(?:Status:|- (?:Total|Passed|Failed|Skipped|Todo):)[^\n]*|^## (?:Fatal Error|Global Errors|Failing Tests)\r?\n.*?(?=^## |\z)' /tmp/wallaby-output.log
+```
+
+Check the result by reading status and errors in the log, along with the coverage or runtime evidence needed for the current question. Expand the excerpt when it lacks the needed context.
+
 ### Run command
 
 Use `run` to start or query a persistent Wallaby test session. Without `--config`, Wallaby identifies the project by the directory in which the command runs. With `--config`, it identifies the project by the specified Wallaby configuration file. Keep the same working directory or `--config` value on later calls to reuse the running session and its live results.
 
-Wallaby sessions are shared by project identity across agent threads. For example, if multiple threads work in the same Git worktree and call `run --config ./wallaby.js`, they attach to the same session. The same applies when they omit `--config` and run from the same directory. Its mode, scope, and live test state are shared: when any thread changes a file, Wallaby reruns affected tests in the background, and every attached thread can read the updated results, coverage, and execution data.
+Wallaby sessions are shared by project identity across agent threads that can reach the same running instance. For example, if multiple threads work in the same Git worktree and call `run --config ./wallaby.js`, they attach to the same session when their execution environments permit it. The same applies when they omit `--config` and run from the same directory. Its mode, scope, and live test state are shared: when any thread changes a file, Wallaby reruns affected tests in the background, and every attached thread can read the updated results, coverage, and execution data.
 
 When Wallaby is not yet running for the project, the first `run` call establishes its mode:
 
 - With no test file paths, Wallaby starts in project mode and runs and watches the entire project.
 - With one or more test file paths, Wallaby starts in exclusive mode and runs and watches only those test files.
 
-A cold project-mode start must complete an initial full test run, and a project-wide `--rerun` schedules every test again. Either can take substantial time on a large suite. Before starting or forcing project-wide work, call `run --check` only when you do not know whether Wallaby is already running for the project. Skip this check when you have already called `run` for the same project identity. If Wallaby is active for the project, `run --check` returns its current report without launching an instance, running tests, or changing the session's mode or scope. If Wallaby is not active or cannot be reached, it exits with `Wallaby is not running for the specified project.` and does not launch it. Read `Mode` in the returned report. In project mode, use `Total` and `Time` to estimate the likely cost of a project-wide rerun. In exclusive mode, those values cover only the active scope. To estimate project-wide cost from an exclusive session, follow an absolute report link to its timestamped directory, then inspect retained sibling directories for the most recent `run.md` with `Mode: project`. When no reliable project-wide values exist, or they indicate a large suite, start or keep the smallest relevant test files in exclusive mode unless the task requires project-wide coverage or full-suite verification.
+Start with `run` for the required scope, without a preliminary `run --check`. It starts or reuses the project's session and returns its report.
+
+A cold project-mode start must complete an initial full test run, and a project-wide `--rerun` schedules every test again. Either can take substantial time on a large suite. Start or keep the smallest relevant test files in exclusive mode unless the task requires project-wide coverage or full-suite verification. Read `Mode` in the returned report. In project mode, use `Total` and `Time` to estimate the likely cost of a project-wide rerun. In exclusive mode, those values cover only the active scope. To estimate project-wide cost from an exclusive session, follow an absolute report link to its timestamped directory, then inspect retained sibling directories for the most recent `run.md` with `Mode: project`.
 
 Later `run` calls reuse that same session:
 
@@ -72,13 +88,11 @@ Later `run` calls reuse that same session:
 - In exclusive mode, passing additional test file paths adds them to the active exclusive scope.
 - In exclusive mode, calling `run` without test file paths expands the session to project mode. Wallaby then runs and watches the entire project, and later file-scoped calls do not narrow it back to exclusive mode.
 
-Wallaby keeps the session running after each command and updates affected test results as files change. If `run` is called while affected tests are still executing, it waits for Wallaby to become idle before producing the report. Any file changes made while it waits schedule their affected tests and extend the wait until Wallaby is idle again. The returned report therefore includes those changes instead of mixing completed results with a test run still in progress.
+Wallaby keeps the session running after each command, runs affected tests in the background as files change, and provides live data to `run`, `analyze`, and `inspect`. Once the session includes the required tests, call `analyze` or `inspect` directly when their reports provide the data you need; call `run` only when you need data from its report. If any of these commands is called while tests are executing, it waits for Wallaby to become idle. Further edits during that wait schedule affected tests and extend the wait, so the returned report includes those changes.
 
-Default to omitting `--rerun`. After an ordinary edit to a source file, test file, or watched configuration, call `run` with the affected test file and optional exact `--test` name. Wallaby detects the edit, reruns affected tests automatically, and waits for the live session to become idle before returning current results. When a test trace is needed, call `analyze --target=test` directly; test analysis performs its own targeted traced run. A recent edit, final verification, or timing measurement does not make live results stale.
+For a long initial or project-wide run, start `run` in a background terminal or an authorized subagent and continue independent analysis or edits while it runs. Wallaby picks up changes made while the command is running, and their affected tests complete before the command returns. Wait for the command to finish before sending another Wallaby command through that terminal or using its report as the verification result.
 
-For a long initial or project-wide run, start `run` in a subagent or background terminal and continue working. Wallaby picks up changes made while the command is running, and their affected tests complete before the command returns. Wait for the delegated or background command to finish before using its report as the verification result.
-
-Use `--rerun` as recovery after identifying stale live state. Valid reasons are relevant external state that Wallaby cannot watch, or an observed failure to rerun after an expected watched change. State the reason before forcing execution. Scope recovery to the smallest known affected test set: pass test file paths to rerun only those files, and add `--test` when only one named test needs to rerun. A targeted `--rerun` works in project mode without rerunning the rest of the project or changing the session to exclusive mode. Omit test file paths only when evidence shows that the entire project's live results are stale.
+Default to omitting `--rerun`. A recent edit, final verification, or timing measurement does not make live results stale. Use `--rerun` as recovery after identifying stale live state. Valid reasons are relevant external state that Wallaby cannot watch, or an observed failure to rerun after an expected watched change. State the reason before forcing execution. Scope recovery to the smallest known affected test set: pass test file paths to rerun only those files, and add `--test` when only one named test needs to rerun. A targeted `--rerun` works in project mode without rerunning the rest of the project or changing the session to exclusive mode. Omit test file paths only when evidence shows that the entire project's live results are stale.
 
 Use `--snapshots` after confirming that snapshot failures represent intended output changes. Scope the update to the affected tests: pass test file paths to update snapshots only for those files, and add `--test` to update snapshots for one named test. In project mode, a targeted snapshot update leaves the session in project mode and does not update snapshots from other tests. Omit test file paths only when snapshots across the entire project should be updated. If Wallaby is not running yet, the first-run mode rules above still apply.
 
@@ -86,7 +100,6 @@ To target one test with `--test`, pass exactly one test file and the test's exac
 
 ```sh
 npx wallaby-skill run # starts or reuses project mode and reports project-wide test results
-npx wallaby-skill run --check # returns the current report only when Wallaby is already running; does not launch or run tests
 npx wallaby-skill run --config ./wallaby.js # starts or reuses project mode identified by the specified config file
 npx wallaby-skill run ./src/feature-a.spec.ts # starts or extends exclusive scope, or reads this file's results in project mode
 npx wallaby-skill run ./src/feature-a.spec.ts ./src/feature-b.spec.ts # starts exclusive mode if needed, or reads their results according to the active mode
@@ -95,6 +108,7 @@ npx wallaby-skill run --rerun ./src/feature-a.spec.ts # forces this test file to
 npx wallaby-skill run --snapshots ./src/feature-a.spec.ts ./src/feature-b.spec.ts # updates snapshots only for the specified test files
 npx wallaby-skill run --snapshots ./src/feature-a.spec.ts --test "feature-a / should match the expected snapshots" # updates snapshots for the named test in the specified file
 npx wallaby-skill run --snapshots # updates snapshots across the project; use only when every snapshot change is intended
+npx wallaby-skill run --check # returns the current report only when Wallaby is already running; does not launch or run tests
 ```
 
 The command prints a concise Markdown report and saves the same content as `run.md`. When a report is produced, exit code `0` corresponds to `Status: succeeded`; exit code `1` corresponds to `Status: failed`. The status is failed when at least one test failed, Wallaby has a fatal run error, or global errors exist. CLI startup, connection, and compatibility failures also exit with code `1`, but may print an error instead of producing a report.
@@ -120,71 +134,84 @@ Read the report in this order:
 - `Coverage` is a link to `coverage.md` when reportable coverage exists. The linked report ranks files by change risk and lists coverage, complexity, change risk, and covering test files for each covered source file. Read `references/coverage.md` for its format.
 - `Graphical User Interface` links to the Wallaby UI when a UI URL is available. Use this link only when the user explicitly asks to open the UI.
 
-Generated `All Tests`, `Coverage`, and `Failing Tests` reports can be large. For specific results in generated reports, prefer `grep` over reading the whole file. For example, to find all tests that mention `estimates sleet near freezing`:
+To find all tests that mention `estimates sleet near freezing` in `All Tests`:
 
 ```sh
-grep -Pzo '(?sm)^### [^\n]*estimates sleet near freezing[^\n]*\n.*?(?=^### |^## |\z)' all-tests.md | tr '\0' '\n'
+rg -U --pcre2 -o '(?sm)^### [^\n]*estimates sleet near freezing[^\n]*\n.*?(?=^### |^## |\z)' all-tests.md
 ```
 
 To find all tests in `tests/temperature.spec.ts`:
 
 ```sh
-grep -Pzo '(?sm)^## tests/temperature\.spec\.ts[^\n]*\n.*?(?=^## |\z)' all-tests.md | tr '\0' '\n'
+rg -U --pcre2 -o '(?sm)^## tests/temperature\.spec\.ts[^\n]*\n.*?(?=^## |\z)' all-tests.md
 ```
 
 To find the coverage entry for `src/temperature.ts`:
 
 ```sh
-grep -Pzo '(?sm)^## src/temperature\.ts[^\n]*\n.*?(?=^## |\z)' coverage.md | tr '\0' '\n'
+rg -U --pcre2 -o '(?sm)^## src/temperature\.ts[^\n]*\n.*?(?=^## |\z)' coverage.md
 ```
 
 ### Analyze command
 
-Use `analyze` when a run report points to tests or files that need deeper investigation. The command reads Wallaby's current results and full coverage information, then prints a Markdown report and saves the same content as `analyze.md`. It supports three analysis types: test analysis for one executed test, file analysis for a whole source file, a whole test file, or a specific source-file location, and files analysis for a batch of source or test files.
+Use `analyze` to find uncovered code, identify which tests exercise a file or location, inspect test failures, or follow a test's execution across files. Choose the analysis type for the information you need:
 
-The command only works when Wallaby is already running for the same project identity used by `run`. Start Wallaby first in project mode, or in exclusive mode that includes the test file being analyzed or tests that cover the source file being analyzed. Then use `analyze` from the same working directory or with the same `--config` value as `run`.
+- Test analysis provides a test's results and coverage for all source files it covers, with an optional execution trace using `--trace`.
+- File analysis provides a file's coverage and information about tests covering that file or a location within it, or tests belonging to a test file. Coverage and test information can be filtered to a specific test.
+- Files analysis provides the same per-file coverage and test information across a batch of files in one command through a combined `Coverage Gaps` report.
 
-If test or single-file analysis cannot resolve the requested target, the command exits with a non-zero code and prints an error message instead of a report. This includes invalid paths, missing files, a test target path that is not a test file, a missing test name, or a source file location that cannot be resolved. Files analysis reports path-specific failures under `Files Analysis Errors` and still analyzes paths it can resolve. Confirm that every requested path has a corresponding `## File:` section before treating a batch as complete.
+Use the analysis report's coverage metrics and `Uncovered` lines and column ranges as the primary coverage evidence. Read a linked `.wcov` artifact only when that information is insufficient to answer a specific coverage question and you need detailed source annotations. When needed, read only the relevant regions.
 
-#### Test analysis
+The command only works when Wallaby is already running for the same project identity used by `run`. Start Wallaby first in project mode, or in exclusive mode that includes the test file being analyzed or tests that cover the source file being analyzed. Then use `analyze` from the same working directory or with the same `--config` value as `run`. In an active session with the required tests included, a preceding `run` is unnecessary, including after edits.
 
-Use `--target test` when a test's execution order or cross-file control flow is needed to explain a failure, unexpected pass, surprising error, log, or behavior. Its primary output is the `Test Execution Trace`, which records executed source lines in order across every file involved. It includes imported modules, setup, and helpers, marks the start of the selected test, and continues through each source line the test reaches. Test analysis reruns the selected test with tracing enabled, so use it only when you will inspect the generated trace. Use test-filtered file analysis for test-scoped coverage without a traced rerun. Read the latest run report or use test-file analysis when you only need current status, timing, logs, or covered-file names.
+If test or single-file analysis cannot resolve the requested target, the command exits with a non-zero code and prints an error message instead of a report. This includes invalid paths, missing files, a test target path that is not a test file, a missing test name, or a source file location that cannot be resolved. Files analysis reports path-specific failures under `Files Not Analyzed` and still analyzes paths it can resolve.
 
-The trace is paired with test-scoped `.wcov` artifacts for every source file covered by the test. Each artifact preserves the complete source and marks every coverable line as `full`, `partial`, or `none`; partially covered lines identify the exact uncovered column ranges and expressions. Read the trace to see what ran and in what order. Read the `.wcov` artifacts to see which lines and expression ranges were fully, partially, or never executed, including uncovered expressions in branches the test did not take.
+The command prints a Markdown report and saves the same content as `analyze.md`.
 
-Every test analysis reruns the exact selected test with tracing enabled, even when Wallaby already has a current result for it. Wallaby runs only that test, together with the imports and lifecycle code required to execute it, then produces the report and artifacts from the new execution.
+#### Analysis types
 
-Pass a target object with the test file path and test name:
+##### Test analysis
+
+Use `--target test` when you need to investigate one test's result, errors, or logs, verify its coverage across source files, or trace its execution to explain unexpected behavior.
+
+Pass the test-file path and exact full test name, including suite names joined with ` / `:
 
 ```sh
 npx wallaby-skill analyze --target="test" "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}"
 ```
 
+Add `--trace` when you need to follow execution order or cross-file control flow to explain a failure, unexpected pass, error, or log. It returns the same report as without `--trace`, with an additional `Test Execution Trace` link.
+
+```sh
+npx wallaby-skill analyze --target="test" "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}" --trace
+```
+
 The main report includes:
 
-- `Status`, `Mode`, `Summary`, `Fatal Error`, and `Global Errors` sections are the same as in the run command report.
-- `Test Analysis` with the selected test's name, status, location, execution time, errors, logs, covered files, and `Test Execution Trace`. The trace is a single logical view of the code the test executes, with source lines shown in execution order, file names, and line numbers. Its `test starts here` comment marks the first line of code in the selected test, after imports and other setup code that runs before the test. Read `references/test-trace.md` when you need the full test-trace format.
-- `Covered Files` links to per-file `.wcov` coverage artifacts for source files covered by the selected test. Each artifact contains the file content with pseudo-block comments after every source line. The comments annotate line numbers and the `full`, `partial`, or `none` state of each coverable line. Partially covered lines can include uncovered column ranges with the corresponding source expressions. Read `references/wcov.md` when you need the full `.wcov` artifact format.
+- `Status`, `Mode`, and any `Fatal Error` or `Global Errors`, with the same meanings as in the run command report. `Status` describes the active session, so it can be `failed` even when the selected test passes.
+- `Test Analysis` with the selected test's full name, status, and available location, execution time, errors, assertion or snapshot differences, stack traces with source context, and logs.
+  - With `--trace`, a `Test Execution Trace` link precedes the test entry. The trace shows executed source lines in order across files, including imports and setup, and marks the selected test's first line with `test starts here`. Read `references/test-trace.md` for its format.
+- `Covered Files` with an entry for each covered source file whose coverage can be exported.
+  - File metadata and available metrics include path, line count, coverage, `change risk anti-patterns`, and size. Coverage metrics are scoped to the selected test.
+  - When the file has coverage gaps, `Uncovered:` lists fully uncovered lines and the uncovered column ranges on partially covered lines.
+  - Each `Detailed Coverage` link points to a `.wcov` artifact showing the file's complete coverage for the selected test.
+- `Run Report` links to a report in the same format as the `run` command report for broader diagnostics from the same session state.
 
 Generated `Test Execution Trace` artifacts can be large. Prefer targeted search instead of reading the full artifact. For example, to find the selected test start:
 
 ```sh
-grep -n -B 20 -A 5 'test starts here' test-trace.md
+rg -n -B 20 -A 5 'test starts here' test-trace.md
 ```
 
-#### File analysis
+##### File analysis
 
-Use `--target file` when a source or test file needs to be understood before editing, when a coverage gap needs to be located, or when you need to choose the tests and verification scope for a change. The command prints a compact summary and links to two separate artifacts: a `.wcov` view of the complete file and a Markdown inventory of the related tests. Use it with `--test` when test-scoped coverage or details for one exact test are needed without a Test Execution Trace. Analyze an exact source location to identify the tests that reach that code. This evidence helps decide what to change, which tests to inspect, run, or add, and how broadly to verify the result.
+Use `--target file` when you need to locate coverage gaps in a source file, identify tests covering a source file or a position within it specified by a line number or a line and column, investigate failures in a test file, or verify which lines and expressions a specific test covers in a source file.
 
-Unlike test analysis, file analysis never schedules or reruns a test. It queries the current results, coverage, and file data already retained by Wallaby, so the report is produced immediately when the session is idle. If affected tests are already running, the command waits for Wallaby to become idle so the data remains consistent, then returns the detailed report without starting more test work.
-
-Pass a target object with the file path. Add `--test` when you need coverage and test details filtered to one exact test.
-
-Add a `location` when you need tests that cover a specific line or a specific line and column. If you know the line and expression but not the column, pass `line` and `expression`; Wallaby resolves the column. If you know a source fragment and expression, pass `fragment` and `expression`; Wallaby resolves the line and column. A base64-encoded `fragment` avoids escaping special characters and newlines in multi-line fragments. The CLI decodes the fragment before searching the file.
+Pass a selector with the required `path`. Add a `location` when you need tests that cover a specific line or a specific line and column. If you know the line and expression but not the column, pass `line` and `expression`; Wallaby resolves the column. If you know a source fragment and expression, pass `fragment` and `expression`; Wallaby resolves the line and column. A base64-encoded `fragment` avoids escaping special characters and newlines in multi-line fragments. The CLI decodes the fragment before searching the file.
 
 ```sh
-npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts'}" # analyzes the whole source file with no location
-npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts'}" --test "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}" # analyzes the whole source file with no location and filters to the exact test
+npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts'}" # analyzes the specified source file
+npx wallaby-skill analyze --target="file" "{path:'src/temperature.spec.ts'}" # analyzes the specified test file
 npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{line:10}}" # analyzes the specified location in the source file by line number
 npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{line:10,expression:'celsius'}}" # analyzes the specified location in the source file by line number, using the expression to resolve the column
 npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{line:10,column:10}}" # analyzes the specified location in the source file by line and column numbers
@@ -192,76 +219,118 @@ npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{
 npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts',location:{fragment:'cmV0dXJuIChjZWxzaXVzICogOSkgLyA1ICsgMzI7',expression:'celsius'}}" # analyzes the specified location in the source file by base64-encoded fragment search, using the expression to resolve the line and column in the first fragment match
 ```
 
-The main report includes:
-
-- `Status`, `Mode`, `Summary`, `Fatal Error`, and `Global Errors` sections with the same meanings as in the run command report.
-- `File Analysis` for a source file, or `Test File Analysis` for a test file.
-- File metadata and available analysis metrics such as path, location, test count, line count, coverage, `change risk anti-patterns`, and size.
-- A `Covering Tests` link for a source file, or a `Tests` link for a test file, points to a separate Markdown artifact containing the complete related-test inventory. The main report does not inline that inventory. The link includes the artifact size; do not open a large test inventory unless test identities, statuses, locations, timings, logs, or covered files are needed. Search it directly when only one test or property is relevant. Read `references/file-tests.md` for the two artifact shapes.
-- `Detailed File Coverage` links to a `.wcov` artifact containing the complete file with line-level `full`, `partial`, or `none` annotations and uncovered expression ranges. Read `references/wcov.md` for its format.
-
-The linked test inventory and `.wcov` artifact can be large. Open the `.wcov` artifact when locating coverage gaps. Open the test inventory when selecting or investigating related tests. Prefer targeted search instead of reading either artifact in full. For example, to find one test in the linked Markdown test inventory:
+To filter the selected file's coverage and related tests to one test, add `--test` with its test-file path and exact full name, including suite names joined with ` / `.
 
 ```sh
-grep -Pzo '(?sm)^### [^\n]*generates severe heat alert[^\n]*\n.*?(?=^### |^## |\z)' file-src@salerts.ts.md | tr '\0' '\n'
+npx wallaby-skill analyze --target="file" "{path:'src/temperature.ts'}" --test "{path:'tests/temperature.spec.ts',name:'celsiusToFahrenheit / converts boiling point'}" # analyzes the specified source file and filters to the exact test
 ```
 
-To find partially covered lines in a `.wcov` file:
+For coverage across all source files covered by that test, use `--target test` without `--trace`.
+
+The main report includes:
+
+- `Status`, `Mode`, and any `Fatal Error` or `Global Errors`, with the same meanings as in the run command report.
+- `File Analysis` for a source file, or `Test File Analysis` for a test file.
+  - File metadata and available analysis metrics such as path, location, test count, line count, coverage, `change risk anti-patterns`, and size. When a `--test` filter matches, coverage metrics and `.wcov` artifacts are scoped to the selected test.
+  - When the file has coverage gaps, `Uncovered:` lists fully uncovered lines and the uncovered column ranges on partially covered lines.
+  - Up to five relevant failing-test entries, each headed by its full test name and showing status, location, timing, error messages, assertion or snapshot differences, stack traces with source context, logs, and covered files when available. Relevance follows the selector: tests covering a source file or location, tests belonging to a test file, or the matching test when filtered. When more than five fail, an omitted-failure count precedes the `Covering Tests` link for a source file or the `Tests` link for a test file. These links contain the complete related-test inventory, including omitted failures.
+- A `Covering Tests` link for a source file, or a `Tests` link for a test file, points to a separate artifact containing the complete related-test inventory. The main report does not inline that inventory. The link includes the artifact size; do not open a large test inventory unless test identities, statuses, locations, timings, logs, or covered files are needed. Search it directly when only one test or property is relevant. Read `references/file-tests.md` for the two artifact shapes.
+- `Detailed Coverage` links to a `.wcov` artifact showing the file's complete coverage.
+- `Run Report` links to a report in the same format as the `run` command report for broader diagnostics from the same session state.
+
+The `Covering Tests` and `Tests` inventories can be large. Open them when selecting or investigating related tests, and prefer targeted search instead of reading an entire inventory. For example, to find one test:
+
+```sh
+rg -U --pcre2 -o '(?sm)^### [^\n]*generates severe heat alert[^\n]*\n.*?(?=^### |^## |\z)' file-src@salerts.ts.md
+```
+
+##### Files analysis
+
+Use `--target files` when you need to compare coverage gaps across source files or review coverage and related-test information for several source or test files in one report.
+
+Pass a `paths` array to analyze specific source or test files relevant to the task:
+
+```sh
+npx wallaby-skill analyze --target="files" "{paths:['src/accounts.ts','src/contracts.ts']}" # analyzes the specified source files
+npx wallaby-skill analyze --target="files" "{paths:['src/accounts.ts','tests/accounts.spec.ts']}" # analyzes the specified source and test files
+```
+
+The selector accepts file paths only. Use `--target file` to analyze a specific source location, or combine it with `--test` to filter a file's coverage and related-test results to one specific test.
+
+Omit the selector to analyze up to 20 source files with the lowest reportable coverage in the active session.
+
+```sh
+npx wallaby-skill analyze --target="files" # analyzes up to 20 source files with the lowest coverage
+```
+
+The main report includes:
+
+- `Status`, `Mode`, and any `Fatal Error` or `Global Errors`, with the same meanings as in the run command report.
+- `Files Analysis` with file tables and brief coverage details.
+  - A source-file table showing every analyzed source file's path, coverage, change risk, and gap count, including files with no gaps or unavailable coverage. Rows are always ordered by lower coverage, then higher change risk, then path; files with unavailable metrics come last.
+  - A test-file table showing path, test count, and failed-test count when test files are included.
+  - Brief `### <path>` sections for up to 20 source files follow the source-file table's order. When a file has gaps, `Uncovered:` introduces its uncovered line numbers and column ranges. Otherwise, the section says there are no gaps or that coverage is unavailable.
+  - `Files Not Analyzed` for paths that could not be analyzed. The main report shows up to three errors; the linked `Coverage Gaps` report contains all of them.
+- `Coverage Gaps` links to the complete batch report with detailed results for every analyzed file, including uncovered expression text and links to `Covering Tests` or `Tests` and `Detailed Coverage`. Read `references/coverage-gaps.md` for details.
+- `Run Report` links to a report in the same format as the `run` command report for broader diagnostics from the same session state.
+
+To list every file-section heading with its line number in `Coverage Gaps`:
+
+```sh
+rg -n '^## ' coverage-gaps.md
+```
+
+To locate the heading for `src/accounts.ts` and its line number in the report:
+
+```sh
+rg -n -Fx '## src/accounts.ts' coverage-gaps.md
+```
+
+To print the complete section for `src/accounts.ts`, starting at its heading and stopping before the next file section:
+
+```sh
+rg -U --pcre2 -o '(?sm)^## src/accounts\.ts\n.*?(?=^## |\z)' coverage-gaps.md
+```
+
+#### Detailed coverage
+
+A `.wcov` artifact contains the complete source file annotated with source line numbers and coverage states: `full`, `partial`, or `none`. It preserves the source file's line count and line positions: line N in the artifact corresponds to line N in the source file, so you can locate coverage information directly by source line number. Partially covered lines also identify uncovered expression ranges when available. Use it to inspect which lines and expressions were executed or missed in their source context. Test analysis and file analysis with a matched `--test` filter show coverage for the selected test; otherwise, coverage reflects the active session. Read [references/wcov.md](references/wcov.md) for the format.
+
+The artifact can be large. Prefer targeted searches instead of reading it in full. For example, to find partially covered lines:
 
 ```sh
 rg -n 'coverage: partial' file-src@salerts.ts.wcov
 ```
 
-To find a source line in a `.wcov` file:
+To find fully uncovered lines:
 
 ```sh
-rg -n -F 'alerts.push({' file-src@salerts.ts.wcov
+rg -n 'coverage: none' file-src@salerts.ts.wcov
 ```
 
-#### Files analysis
-
-Use `--target files` to analyze several source or test files from the same current Wallaby state and write their coverage gaps to one `coverage-gaps.md` artifact. Like single-file analysis, files analysis does not schedule or rerun tests. It waits for the running session to become idle, then queries the retained results.
-
-With no target object, or with an empty `paths` array, Wallaby automatically selects up to 20 source files with the lowest current coverage. Use this as a quick discovery shortlist, not as proof that every relevant repository file was reviewed. The selection reflects the active Wallaby scope and omits higher-coverage files that may still have valuable gaps or high change risk.
-
-Pass an explicit `paths` array when the files are already known or when the candidate set is larger than the automatic shortlist:
+To show source line 146 of `src/alerts.ts` with its coverage annotation:
 
 ```sh
-npx wallaby-skill analyze --target="files" # analyzes up to 20 lowest-coverage source files
-npx wallaby-skill analyze --target="files" "{paths:['src/accounts.ts','src/contracts.ts']}" # analyzes the requested files together
+sed -n '146p' file-src@salerts.ts.wcov
 ```
 
-The batch target accepts file paths only. It does not support a source `location` or `--test` filter; use `--target file` when either is required.
-
-The terminal report includes the batch counts, path errors, a compact source-file table, an optional test-file table, and a `Coverage Gaps` link. For an explicit batch, the source table shows only files with gaps. If more than 20 source files have gaps, the table shows 20 prioritized entries; `coverage-gaps.md` still contains every analyzed file. Automatic selection lists every selected source file, including files with no gaps.
-
-Open `coverage-gaps.md` before deciding which tests to change. Each `## File: <path>` section reports coverage, change risk, covering-test count, and all line-level gaps, with links to that file's complete related-test inventory and `.wcov` artifact. Check `Files Analysis Errors` and confirm that every intended path appears as a file section. Read `references/coverage-gaps.md` for the complete format and navigation patterns.
-
-For a large report, locate file sections without reading it end to end:
+To find a source expression with its coverage annotation and surrounding lines:
 
 ```sh
-rg -n '^## File: ' coverage-gaps.md
-rg -n -F '## File: src/accounts.ts' coverage-gaps.md
-awk -v target='src/accounts.ts' '
-  $0 == "## File: " target { found=1 }
-  found && /^## File: / && $0 != "## File: " target { exit }
-  found { print }
-' coverage-gaps.md
+rg -n -C 3 -F 'alerts.push({' file-src@salerts.ts.wcov
 ```
-
-Use the listed line and column ranges to open the corresponding source and related tests. Open the linked `.wcov` artifact only when the consolidated gaps plus the source file do not provide enough context, or when the complete annotated source is needed.
 
 ### Inspect command
 
-Use `inspect` when a failure or unexpected behavior depends on runtime state that static source, coverage, errors, and existing logs do not explain. Inspect variables and expressions at exact source locations to follow state changes, check the inputs and conditions behind a branch, or see why an assertion receives a particular value. Use this runtime evidence instead of adding and later removing temporary `console.log` statements.
+Use `inspect` directly when a failure or unexpected behavior depends on runtime state that static source, coverage, errors, and existing logs do not explain. Inspect variables and expressions at exact source locations to follow state changes, check the inputs and conditions behind a branch, or see why an assertion receives a particular value. Use this runtime evidence instead of adding and later removing temporary `console.log` statements.
+
+The command only works when Wallaby is already running for the same project identity used by `run`. Start Wallaby first in project mode, or in exclusive mode that includes tests reaching the inspected locations. Then use `inspect` from the same working directory or with the same `--config` value as `run`. In an active session with the required tests included, a preceding `run` is unnecessary, including after edits.
 
 Each inspection captures the expression's value in every test execution context that reaches its source location and identifies the test that produced each value. Pass multiple inspections across different files and locations in one request to investigate related runtime state together. Use `--test` to narrow the main report to values from matching tests while retaining a link to the complete unfiltered results.
 
 For every resolved inspection in the request, Wallaby adds temporary runtime instrumentation, then executes the combined affected test set to collect all requested values. The command waits for those tests to finish before returning a consistent report. `--test` filters the reported values; it does not limit which affected tests execute.
 
 After collecting the values, use `inspect --clear` without inspection targets to remove them. A clear-only request schedules no tests and completes immediately when the session is idle. When `--clear` is combined with new inspection targets, Wallaby clears the previous values first, then adds the new instrumentation and executes its affected tests as usual.
-
-The command only works when Wallaby is already running for the same project identity used by `run`. Start Wallaby first in project mode, or in exclusive mode that includes tests reaching the inspected locations. Then use `inspect` from the same working directory or with the same `--config` value as `run`.
 
 Pass each inspection target as a separate argument containing a file path, a source location, and an expression. The source location can be a code fragment, a line number, or a line and column. For example, to inspect the value of the `alerts` variable in `src/alerts.ts`:
 
@@ -306,20 +375,21 @@ When `--clear` is used without inspection targets, the command prints `Cleared a
 
 Otherwise, the command prints a Markdown report and saves the same content as `inspect.md`. A non-zero exit code usually means the report contains failing tests or errors, though it may also mean the CLI or Wallaby itself failed:
 
-- `Status`, `Mode`, `Summary`, `Fatal Error`, and `Global Errors` sections are the same as in the run command report.
+- `Status`, `Mode`, and any `Fatal Error` or `Global Errors`, with the same meanings as in the run command report.
 - `Runtime Values` shows captured values inline with the source file, line, expression, formatted value, and test that produced each value. If requested inspections could not be captured, it also shows warnings with the path, expression, location, and reason. If additional values are omitted, it links to the full runtime-values report. Read `references/runtime-values.md` when you need the full runtime-values report format.
 - When `--test` is used, the main report filters runtime values by test name and links to the full unfiltered report when other values are available. Uncaptured-inspection warnings are still shown because they describe requested inspection locations, not captured values from a specific test.
+- `Run Report` links to a report in the same format as the `run` command report for broader diagnostics from the same session state.
 
-Generated `Runtime Values` reports can be large. For specific results, prefer `grep` over reading the whole file. For example, to find all captured values for `src/alerts.ts`:
+To find all captured values for `src/alerts.ts` in `Runtime Values`:
 
 ```sh
-grep -Pzo '(?sm)^## src/alerts\.ts[^\n]*\n.*?(?=^## |\z)' runtime-values.md | tr '\0' '\n'
+rg -U --pcre2 -o '(?sm)^## src/alerts\.ts[^\n]*\n.*?(?=^## |\z)' runtime-values.md
 ```
 
 To find all runtime values produced by tests whose names mention `combined conditions`:
 
 ```sh
-grep -Pzo '(?sm)^## [^\n]*\n.*?^- name: .*combined conditions.*\n.*?(?=^## |\z)' runtime-values.md | tr '\0' '\n'
+rg -U --pcre2 -o '(?sm)^## [^\n]*\n.*?^- name: .*combined conditions.*\n.*?(?=^## |\z)' runtime-values.md
 ```
 
 ### Stop command

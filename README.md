@@ -30,6 +30,25 @@ The workflow prefers test-only changes. When a test demonstrates a product defec
 
 See [SKILL.md](skills/wallaby/SKILL.md) for subcommand routing and dependencies, and the [improve workflow](skills/wallaby/references/improve.md) for discovery, verification, and reporting details.
 
+### write
+
+Use this workflow to write new tests one at a time. Before writing each test, the agent states its expected behavior and predicts which source regions it will cover or leave untouched. It then checks the result against that test's Wallaby coverage, investigates mismatches, and reviews assertion quality before moving on.
+
+Specify a source file, test file, directory, change set, or behavior. Without an explicit target, the workflow uses the current task context and asks for a target when none is available. It covers meaningful scenarios, boundaries, and failure paths within that scope, with no default coverage percentage.
+
+Example requests:
+
+```text
+$wallaby write src/accounts.ts
+$wallaby write tests/accounts.spec.ts
+$wallaby write tests for the account suspension behavior we discussed
+$wallaby write tests for the files changed in this branch
+```
+
+Every accepted test needs verified execution and assertions that would catch a plausible defect. Mutation checks are optional when that evidence leaves doubt. The workflow prefers test-only changes but can fix a proven source defect with a regression test. It reports predictions and results as brief live updates and finishes with verification and any unresolved gaps.
+
+See the [write workflow](skills/wallaby/references/write.md) for the per-test process and quality criteria.
+
 ## wallaby-cli
 
 `wallaby-cli` gives coding agents a CLI interface to Wallaby. Through this skill, an agent can use Wallaby's test execution, coverage analysis, execution traces, runtime inspection, and snapshot management while creating tests, implementing features, fixing bugs, or reviewing code.

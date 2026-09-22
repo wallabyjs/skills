@@ -1,41 +1,26 @@
-# File-analysis test artifacts
+# Covering Tests and Tests reports
 
-`analyze --target=file` and `analyze --target=files` keep terminal responses compact by writing each file's complete related-test inventory to a separate Markdown artifact. A report links it as `Covering Tests` for a source file or `Tests` for a test file and shows its size. The generated name starts with `file-`, escapes each `@` as `@@`, encodes `/` as `@s` and `\` as `@b`, then appends `.md`; for example, `src/core.ts` becomes `file-src@score.ts.md`.
-
-Open this artifact only when the related test identities or details are needed. The test count and other file metrics are already present in the main report. For a large artifact, search for the relevant test name or field instead of reading the whole file.
-
-Both artifact variants start with analysis metadata:
+The `Covering Tests` link for a source file opens a report headed `# File Analysis`. The `Tests` link for a test file opens one headed `# Test File Analysis`. Both reports start with file metadata:
 
 ```md
-- path: <target-file-path>
-- location: line <line>, column <column>
+- path: <file-path>
 - tests: <count>
-- tests: <count>/<failed-count>
-- tests: <count> (filter applied: "<test-name>" (<test-file-path>))
-- tests: <count> (filter applied: "<test-name>" (<test-file-path>)) but no tests found
 - lines: <line-count>
 - coverage: <percent>%
 - change risk anti-patterns: <number>
 - size: <size>
 ```
 
-Format details:
+`- path:` and `- tests:` are always present. The other metrics appear when available. A resolved source location adds `- location: line <line>, column <column>` after the path; the column appears only when known. When listed tests have failures, the test count is `<total>/<failed>`. A test filter adds `(filter applied: "<test-name>" (<test-file-path>))` to that line, followed by `but no tests found` if it matched no related test.
 
-- `- path:` is always present.
-- `- location:` appears when the analyze target included a resolved location.
-- `- tests:` is always present. When one or more listed tests failed, the value is `<total>/<failed>`.
-- A filter note appears when `--test` or `target.test` was used.
-- `- lines:`, `- coverage:`, `- change risk anti-patterns:`, and `- size:` appear when Wallaby has those values for the target.
-- Source-file analysis can include coverage and change-risk metrics. Test-file analysis usually includes line count and size.
+## Source-file report
 
-## Source-file artifact
-
-The `Covering Tests` link for a source file uses this shape:
+A source-file report uses this shape:
 
 ```md
 # File Analysis
 
-- path: <source-file-path>
+- path: src/accounts.ts
 - tests: <count>
 - lines: <line-count>
 - coverage: <percent>%
@@ -50,16 +35,16 @@ The `Covering Tests` link for a source file uses this shape:
 - time: <time>ms
 ```
 
-The inventory is a flat sequence of all tests that cover the source target. It is not grouped by test file. Each entry contains the fields available for that test; status is always present, while location and time depend on runner data.
+`Covering Tests` lists all tests covering the selected source file or location, or the matching test when filtered. Entries are not grouped by test file. A failing entry can include its errors and stack traces. Source-file entries omit logs and covered-file lists.
 
-## Test-file artifact
+## Test-file report
 
-The `Tests` link for a test file uses this shape:
+A test-file report uses this shape:
 
 ````md
 # Test File Analysis
 
-- path: <test-file-path>
+- path: tests/accounts.spec.ts
 - tests: <count>
 - lines: <line-count>
 - size: <size>
@@ -95,14 +80,6 @@ Stack trace:
 - ...
 ````
 
-The ranked section is omitted when no ranking is available. Test entries are not grouped by file because every listed test belongs to the analyzed test file. Entry fields are shown when the formatter has data for them; `Covered Files` identifies the source files reached by each test.
+`Tests` lists the tests belonging to the selected test file. The ranking shows up to five tests by execution time and is omitted when the report has no tests or an applied filter matched a test. Test entries include errors, stack traces, logs, and covered files when available.
 
-## Filters and locations
-
-When `--test` or `target.test` filters file analysis, the metadata records the filter and the artifact lists only the matching test. A resolved source location appears in metadata as `- location: line <line>, column <column>`. Filtered analysis omits ranked summaries.
-
-If no tests are found, the report contains metadata followed by:
-
-```md
-No tests found.
-```
+If either report has no listed tests, its test section says `No tests found.` instead of showing test entries. Test names include their full suite path, joined with ` / `; location and time appear when Wallaby has those values.

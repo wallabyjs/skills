@@ -14,7 +14,7 @@ Invoke it as `$wallaby <subcommand> [instructions]`.
 
 Use this workflow to find meaningful gaps in a test suite and strengthen its assertions. It reviews uncovered branches, weak assertions, boundary behavior, failure paths, and other cases where tests may miss a defect.
 
-By default, it considers source files with coverage at or below 95% and uses change risk to prioritize them. You can specify a file, directory, Git change set, or signal threshold. Without an explicit scope, it works across the repository. You can also request a test-quality review without using coverage, complexity, or change risk to select candidates.
+Without an explicit scope or signal, it considers repository source files with coverage at or below 95% and uses change risk to prioritize them. You can specify a file, directory, Git change set, or signal. With an explicit scope and no signal, it reviews every meaningful source file in that scope regardless of coverage. You can also request a test-quality review without using coverage, complexity, or change risk to select candidates.
 
 Example requests:
 
@@ -26,7 +26,7 @@ $wallaby improve src/ with coverage below 90%
 $wallaby improve tests/ without using coverage, complexity, or CRAP as discovery signals
 ```
 
-The workflow prefers test-only changes. When a test demonstrates a product defect, it can make a source fix backed by the intended behavior and a regression test. Coverage is a review threshold; completion depends on protecting meaningful behavior and explaining any remaining gaps.
+The workflow prefers test-only changes. When a test demonstrates a product defect, it can make a source fix backed by the intended behavior and a regression test. Any applicable coverage threshold is a review bar; completion depends on protecting meaningful behavior and explaining any remaining gaps.
 
 See [SKILL.md](skills/wallaby/SKILL.md) for subcommand routing and dependencies, and the [improve workflow](skills/wallaby/references/improve.md) for discovery, verification, and reporting details.
 

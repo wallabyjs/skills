@@ -1,6 +1,6 @@
 # Improve
 
-Use coverage and Change Risk Anti-Patterns (CRAP) to find source files whose tests need work. Raise useful coverage and strengthen the tests around the selected logic. Coverage selects where to investigate; observable behavior decides what to test. Here, a source file is a non-test file whose behavior tests exercise or should exercise.
+Use Wallaby evidence to find source files whose tests need work. Raise useful coverage and strengthen the tests around the selected logic. The requested scope and signals determine where to investigate; observable behavior decides what to test. Here, a source file is a non-test file whose behavior tests exercise or should exercise.
 
 ## Interpret the request
 
@@ -20,7 +20,7 @@ In a Git repository, scope may also describe a change set:
 
 Resolve the change set from available Git and pull-request metadata. For a pull request, use its actual base and head when available; otherwise infer the comparison base from branch and upstream metadata and report the assumption. Apply the source-scope and test-scope rules above to the resulting paths: include related tests for changed source files and the exercised source files for changed tests. Exclude unrelated working-tree changes unless the user includes them in the scope.
 
-Use signal thresholds stated by the user. They may filter or rank by coverage, cyclomatic complexity, CRAP, failures, or a combination. Preserve comparison operators and combinations from the request. When the user gives no coverage, complexity, or CRAP threshold, select source files with coverage at or below 95%, then use CRAP to prioritize the riskier files. Treat relevant source files missing from Wallaby's coverage report as uncovered candidates rather than silently excluding them; omit generated, vendored, declaration-only, and configuration files that are not meaningful test targets.
+Use signals stated by the user. They may filter or rank by coverage, cyclomatic complexity, CRAP, failures, or a combination. Preserve comparison operators and combinations from the request. Apply the default coverage cutoff of 95% or less only when the request has neither an explicit scope nor an explicit signal. With an explicit scope and no signal, consider every meaningful source file in that scope regardless of coverage; use CRAP and other evidence to prioritize the review. Treat relevant source files missing from Wallaby's coverage report as uncovered candidates rather than silently excluding them; omit generated, vendored, declaration-only, and configuration files that are not meaningful test targets.
 
 A failing test is also a signal. Include failures inside the requested scope and failures that prevent trustworthy analysis or verification of that scope. With repository-wide scope, include every current failure. Diagnose the promised behavior before deciding whether the test or source code is wrong. A product defect may require a source change, but do not alter behavior merely to make coverage easier to reach.
 
@@ -37,7 +37,7 @@ Start or query Wallaby in a mode that can produce truthful evidence for the requ
 Read the `run` report and its linked coverage and all-tests reports as needed. Build the candidate set before editing:
 
 1. Apply the requested scope to source files and test failures.
-2. Apply the explicit signal expression, or the default coverage threshold of 95% or less.
+2. Apply the explicit signal expression, if any. With no explicit signal or scope, apply the default coverage cutoff of 95% or less. With an explicit scope and no signal, keep every meaningful in-scope source file.
 3. Account for meaningful in-scope source files absent from the coverage report.
 4. Rank candidates by the user's stated priority. Otherwise prefer higher CRAP, failures, lower coverage, important behavior, and clear test-quality defects. Use slow unit tests only as a secondary ranking signal.
 
@@ -51,7 +51,7 @@ Look for and, when accessible, read the Software Requirements Specification (SRS
 
 Before changing source code instead of a test, identify the strongest available basis for the change. Prefer an explicit requirement or documented contract when one is accessible; otherwise use consistent repository evidence. If the evidence conflicts or leaves a material externally observable behavior ambiguous, defer the affected test or source file without changing the ambiguous behavior. Record the file, conflicting evidence, and decision needed in the final report so the user can resolve it, then continue with the other candidates. Keep a regression test with every source change and report the requirement, document, or repository evidence that justified it. State when no relevant documentation was available.
 
-In signal-driven mode, apply this review to every selected source file and its related tests. Coverage chooses candidates, but it does not define the assertions or the completion criterion. A prominent coverage or change-risk result is one candidate, not the scope.
+In signal-driven mode, apply this review to every selected source file and its related tests. Scope and any explicit signals choose candidates; coverage alone does not define the assertions or the completion criterion. A prominent coverage or change-risk result is one candidate, not the scope.
 
 In signal-free mode, inspect every relevant source and test file within the requested scope without using coverage, cyclomatic complexity, or CRAP to select or rank candidates. Consider every problem category below from the source and tests, then compare plausible candidates from distinct categories before selecting targets. After discovery, use all Wallaby runtime evidence, including coverage, cyclomatic complexity, and CRAP, to confirm or reject candidates, understand their tests, and choose assertions that protect observable behavior. Address the high-confidence candidates that remain. Completing one improvement does not complete a repository-wide request while other distinct candidates are still supported by the code and tests.
 
@@ -80,7 +80,7 @@ Read `coverage-gaps.md`, check `Files Analysis Errors`, and confirm that every r
 
 Classify every uncovered or partially covered region in the selected source file before moving on. Add tests for gaps that expose meaningful public results, errors, state changes, or invariants. Leave a gap only when it has no valuable observable test, and record the concrete reason. Also review fully covered logic for weak assertions and the other test-quality problems above. Coverage state alone does not prove that behavior is protected.
 
-Use single-file analysis when a source location or one test's coverage contribution matters; files analysis does not accept locations or test filters. Use `analyze --target=test` when execution order or cross-file control flow matters. Use `inspect` when static code, coverage, failures, and existing logs do not explain the runtime state. Clear inspections after the investigation.
+Use single-file analysis for a source location or one test's coverage contribution to a specific file; files analysis does not accept locations or test filters. Use `analyze --target=test` to review one test's result and coverage gaps across every source file it covers. Add `--trace` when execution order or cross-file control flow matters. Use `inspect` when static code, coverage, failures, and existing logs do not explain the runtime state. Clear inspections after the investigation.
 
 For each gap, identify the missing observable behavior before writing a test. Apply the test-quality review above to the selected source logic and its tests, including lines that already show full coverage.
 
@@ -97,7 +97,7 @@ Before leaving a candidate, confirm all of the following:
 - every valuable gap found in that review has a test, or the candidate is explicitly deferred;
 - every remaining gap has a concrete reason to stay uncovered;
 - baseline and current file coverage were compared;
-- coverage below the applicable user-supplied threshold, or the default 95%, is fully explained by the recorded non-actionable regions.
+- when a threshold applies, coverage below it is fully explained by the recorded non-actionable regions.
 
 If a test exposes an implementation defect against the intended behavior, make the smallest source change consistent with the best available evidence and keep the regression test.
 
@@ -105,8 +105,8 @@ After a candidate's affected Wallaby tests are green, and before moving to anoth
 
 ## Completion
 
-Treat the applicable coverage threshold as a review bar, not an unconditional numeric deliverable. Use the user's threshold when supplied and 95% otherwise. A selected file below that threshold remains actionable while its `coverage-gaps.md` section, or an individual `.wcov` artifact opened for deeper review, contains valuable, testable gaps. Keep protecting those gaps and work toward the threshold. A green test or any coverage increase below the threshold is not enough to complete the candidate.
+Treat an applicable coverage threshold as a review bar, not an unconditional numeric deliverable. Use the user's coverage threshold when supplied; use 95% only when the request has neither an explicit scope nor an explicit signal. A scoped request without a user-supplied coverage threshold has no coverage cutoff or percentage target. A selected file remains actionable while its `coverage-gaps.md` section, or an individual `.wcov` artifact opened for deeper review, contains valuable, testable gaps. Keep protecting those gaps. A green test or a coverage increase alone is not enough to complete the candidate.
 
-Completion below the threshold is valid only after every remaining uncovered or partially covered region has a recorded reason to remain uncovered, such as unreachable or generated code, defensive code without a testable contract, environment-specific behavior, or code with no meaningful observable effect. If a remaining region protects product behavior, add a test and continue toward the threshold. Do not add hollow assertions or duplicate cases merely to reach a number. Continue through the in-scope candidate set while actionable candidates remain, and document why any signal-matching file needs no valuable test change.
+Complete a candidate only after every remaining uncovered or partially covered region has a recorded reason to remain uncovered, such as unreachable or generated code, defensive code without a testable contract, environment-specific behavior, or code with no meaningful observable effect. If a remaining region protects product behavior, add a test. Do not add hollow assertions or duplicate cases merely to reach a number. Continue through the in-scope candidate set while actionable candidates remain, and document why any selected file needs no valuable test change.
 
-Finish with Wallaby verification proportional to the scope. For repository-wide work, obtain project-mode final results. Report baseline and final coverage and CRAP for every investigated or changed source file, whether it reached the applicable threshold, and the concrete reasons for finishing below it. For each one, also report any valuable gap left unresolved and its concrete reason. In signal-free mode, keep coverage and CRAP as post-discovery evidence rather than retroactively using them to define the candidate set. When manual mutation testing was used, report the mutations tried, whether the tests killed them, and how surviving mutations changed the tests. Report the result of every specified per-candidate verification command. Confirm which relevant failures were resolved and identify any deferred failures that remain. One improved file does not complete a repository-wide request when other actionable candidates remain.
+Finish with Wallaby verification proportional to the scope. For repository-wide work, obtain project-mode final results. Report baseline and final coverage and CRAP for every investigated or changed source file. When a threshold applies, report whether each file reached it and the concrete reasons for finishing below it. For each file, also report any valuable gap left unresolved and its concrete reason. In signal-free mode, keep coverage and CRAP as post-discovery evidence rather than retroactively using them to define the candidate set. When manual mutation testing was used, report the mutations tried, whether the tests killed them, and how surviving mutations changed the tests. Report the result of every specified per-candidate verification command. Confirm which relevant failures were resolved and identify any deferred failures that remain. One improved file does not complete a repository-wide request when other actionable candidates remain.
